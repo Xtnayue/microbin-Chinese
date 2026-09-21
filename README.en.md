@@ -64,6 +64,8 @@ The old fixed set of five privacy levels (`public` / `unlisted` / `readonly` / `
 
 Client-side (browser) encryption — the old `secret` level — has been **removed**; only server-side encryption remains.
 
+The shipped configuration templates were brought in line as well: the five variables that went away with the old model (`MICROBIN_PRIVATE`, `MICROBIN_ENABLE_READONLY`, `MICROBIN_ENCRYPTION_CLIENT_SIDE`, `MICROBIN_ENCRYPTION_SERVER_SIDE`, `MICROBIN_DEFAULT_PRIVACY`) are gone from both `.env` and `compose.yaml`, which now carry `MICROBIN_ENABLE_UNLISTED`, `MICROBIN_ENABLE_READ_PASSWORD`, `MICROBIN_ENABLE_WRITE_PASSWORD`, `MICROBIN_DEFAULT_PERMISSIONS` and `MICROBIN_LANGUAGE` instead. These two files are exactly what `docker-setup.sh` downloads and feeds to `docker compose`, so leaving them stale means an operator sets a variable that does nothing — silently, with no error anywhere.
+
 Permission passwords are never stored. What is stored is a verification value `encrypt(upload id, password)`; a submitted password is accepted when decrypting that value yields the upload id. Two benefits:
 
 1. It works regardless of whether the content is empty — this fixes the old bug where an attachment-only upload (empty text) could not have its password verified;

@@ -67,6 +67,8 @@ microbin
 
 同时**去掉了浏览器端加密**（原 `secret` 档），只保留服务端加密。
 
+配置模板已同步跟进：`.env` 与 `compose.yaml` 里 5 个随旧模型一起失效的变量（`MICROBIN_PRIVATE`、`MICROBIN_ENABLE_READONLY`、`MICROBIN_ENCRYPTION_CLIENT_SIDE`、`MICROBIN_ENCRYPTION_SERVER_SIDE`、`MICROBIN_DEFAULT_PRIVACY`）已删除，并补上 `MICROBIN_ENABLE_UNLISTED`、`MICROBIN_ENABLE_READ_PASSWORD`、`MICROBIN_ENABLE_WRITE_PASSWORD`、`MICROBIN_DEFAULT_PERMISSIONS` 与 `MICROBIN_LANGUAGE`。这两份模板正是 `docker-setup.sh` 实际下载并使用的配置入口，若不同步，用户照文档设了变量却完全不起作用（且不会有任何报错）。
+
 权限密码不落库：落库的是校验值 `encrypt(上传 id, 密码)`；校验时用提交上来的密码解密该值，结果恰好等于该上传的 id 即视为通过。这样做的两个好处：
 
 1. 与正文是否为空无关 —— 修复了原模型下「纯附件上传（正文为空）无法校验密码」的问题；

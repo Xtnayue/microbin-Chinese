@@ -58,7 +58,7 @@ The old fixed set of five privacy levels (`public` / `unlisted` / `readonly` / `
 
 | Permission | Values | Meaning | Applies to |
 | --- | --- | --- | --- |
-| `read` | `allow` / `password` | Who can see the content. With `password`, the text and all attachments are stored encrypted with that password on the server | `/upload/{id}`, `/raw/{id}`, `/file/{id}`, `/archive/{id}`, the edit page |
+| `read` | `allow` / `password` | Who can see the content. With `password`, the text and all attachments are stored encrypted with that password on the server | `/upload/{id}`, `/raw/{id}`, `/file/{id}`, `/archive/{id}`, the URL short link `/url/{id}` and `/u/{id}`, the edit page |
 | `write` | `allow` / `password` / `refuse` | Who can modify or delete. `password` is an authorization check only and does **not** encrypt anything; `refuse` rejects everyone (the admin password can still delete) | saving edits, `/remove/{id}`, the "edit / delete" buttons |
 | `list` | `yes` / `no` | Whether it appears on the public `/list` page | `/list` only |
 
@@ -104,6 +104,7 @@ Note: content uploaded with the old browser-side encryption (the `secret` level)
 1. **The JSON backend ignored `--data-dir`** — the database path was hardcoded to `pasta_data/database.json`, so `--data-dir` had no effect with `--json-db`, and startup panicked whenever `pasta_data/` did not exist (the Docker image only creates `microbin_data/`, so `--json-db` in a container was effectively broken on startup). It now follows `--data-dir`, like the SQLite backend, and relocates the old file once (see above).
 2. **Editing a password-protected upload wrote the plaintext back to the database** — upstream's `post_edit_private` overwrote the stored value with the decrypted text, so the upload silently lost its password protection after the first edit. The content is now re-encrypted with the `read` password before being saved.
 3. **Downloading a protected upload as a zip produced undecryptable ciphertext** — `/archive/{id}` used to stuff the `.enc` files straight into the zip; with browser-side decryption gone those files are useless. It now verifies the `read` password and returns the **decrypted** contents.
+4. **URL short links ignored the read permission and silently broke** — `/url/{id}` and `/u/{id}` returned `content` verbatim as the `Location` header. With `read=password` that `content` is ciphertext, so the browser was redirected onto a blob of ciphertext and the link was dead (not a plaintext leak). They now redirect to the password page `/auth_url/{id}` first, and only decrypt and forward to the target once the password checks out. `read=allow` short links behave exactly as before.
 
 ### Bilingual interface
 

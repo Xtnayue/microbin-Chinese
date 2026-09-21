@@ -61,7 +61,7 @@ microbin
 
 | 权限 | 取值 | 含义 | 作用范围 |
 | --- | --- | --- | --- |
-| `read` | `allow` / `password` | 谁能看到内容。取 `password` 时正文与全部附件在服务端以该密码加密存储 | `/upload/{id}`、`/raw/{id}`、`/file/{id}`、`/archive/{id}`、编辑页 |
+| `read` | `allow` / `password` | 谁能看到内容。取 `password` 时正文与全部附件在服务端以该密码加密存储 | `/upload/{id}`、`/raw/{id}`、`/file/{id}`、`/archive/{id}`、URL 短链 `/url/{id}` 与 `/u/{id}`、编辑页 |
 | `write` | `allow` / `password` / `refuse` | 谁能修改或删除。`password` 只做授权判定，**不参与加密**；`refuse` 一律拒绝（管理员密码仍可删除） | 保存编辑、`/remove/{id}`、页面上「编辑 / 删除」入口的显示 |
 | `list` | `yes` / `no` | 是否出现在公开的 `/list` 列表页 | 仅 `/list` |
 
@@ -104,11 +104,12 @@ read 密码与 write 密码职责分离：read 密码额外用于加解密正文
 
 #### 三、顺带修复的上游问题
 
-重构权限模型的过程中发现并修掉了三个上游遗留问题：
+重构权限模型的过程中发现并修掉了四个上游遗留问题：
 
 1. **JSON 后端忽略 `--data-dir`** —— 上游把数据库路径硬编码成 `pasta_data/database.json`，因此 `--json-db` 下 `--data-dir` 完全不生效；而且只要 `pasta_data/` 不存在，启动阶段就会在创建临时文件时 panic（Docker 镜像里只建了 `microbin_data/`，所以容器中 `--json-db` 其实是启动即挂）。现已改为与 SQLite 后端一致，跟随 `--data-dir`，并对旧位置做一次性搬迁（见上文）。
 2. **编辑受密码保护的上传会把明文写回数据库** —— 上游 `post_edit_private` 用解密后的正文覆盖了存储值，导致该上传在首次编辑之后就不再受密码保护。现改为始终用 read 密码重新加密后再落库。
 3. **打包下载受保护的上传会得到无法解密的密文** —— `/archive/{id}` 原先把 `.enc` 密文直接塞进 zip；在去掉浏览器端解密之后这些文件已无意义，现改为校验 read 密码后返回**解密**的内容。
+4. **URL 短链不校验读权限，受保护时静默失效** —— `/url/{id}` 与 `/u/{id}` 直接把 `content` 作为 `Location` 返回。`read=password` 时 `content` 是密文，于是浏览器被跳到一段密文上，链接坏掉（不是明文泄露）。现改为先引导到密码页 `/auth_url/{id}`，校验通过后解密目标地址再跳转；`read=allow` 的短链行为不变。
 
 ### 本地构建（Windows）
 

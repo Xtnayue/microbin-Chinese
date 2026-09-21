@@ -175,6 +175,81 @@ pub async fn auth_raw_pasta_with_status(
         .body(ErrorTemplate { args: &ARGS }.render().unwrap())
 }
 
+#[get("/auth_url/{id}")]
+pub async fn auth_url(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
+    // get access to the pasta collection
+    let mut pastas = data.pastas.lock().unwrap();
+
+    remove_expired(&mut pastas);
+
+    let intern_id = if ARGS.hash_ids {
+        hashid_to_u64(&id).unwrap_or(0)
+    } else {
+        to_u64(&id).unwrap_or(0)
+    };
+
+    for (_i, pasta) in pastas.iter().enumerate() {
+        if pasta.id == intern_id {
+            return HttpResponse::Ok().content_type("text/html; charset=utf-8").body(
+                AuthPasta {
+                    args: &ARGS,
+                    id: id.into_inner(),
+                    status: String::from(""),
+                    permission: String::from("read"),
+                    path: String::from("url"),
+                    query: String::new(),
+                }
+                .render()
+                .unwrap(),
+            );
+        }
+    }
+
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(ErrorTemplate { args: &ARGS }.render().unwrap())
+}
+
+#[get("/auth_url/{id}/{status}")]
+pub async fn auth_url_with_status(
+    data: web::Data<AppState>,
+    param: web::Path<(String, String)>,
+) -> HttpResponse {
+    // get access to the pasta collection
+    let mut pastas = data.pastas.lock().unwrap();
+
+    remove_expired(&mut pastas);
+
+    let (id, status) = param.into_inner();
+
+    let intern_id = if ARGS.hash_ids {
+        hashid_to_u64(&id).unwrap_or(0)
+    } else {
+        to_u64(&id).unwrap_or(0)
+    };
+
+    for (_i, pasta) in pastas.iter().enumerate() {
+        if pasta.id == intern_id {
+            return HttpResponse::Ok().content_type("text/html; charset=utf-8").body(
+                AuthPasta {
+                    args: &ARGS,
+                    id,
+                    status,
+                    permission: String::from("read"),
+                    path: String::from("url"),
+                    query: String::new(),
+                }
+                .render()
+                .unwrap(),
+            );
+        }
+    }
+
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(ErrorTemplate { args: &ARGS }.render().unwrap())
+}
+
 #[get("/auth_edit_private/{id}")]
 pub async fn auth_edit_private(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
     // get access to the pasta collection

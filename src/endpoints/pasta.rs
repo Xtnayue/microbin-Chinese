@@ -228,6 +228,23 @@ fn urlresponse(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse
     }
 
     if found {
+        // ---- read 权限 ----
+        // URL 短链的目标地址在 read 权限要求密码时是密文，直接 302 过去
+        // 只会得到一个失效的链接（既非明文泄露，也非可用跳转），
+        // 所以先引导到密码页；校验通过后由 `postredirecturl` 解密再跳转。
+        if pastas[index].read_requires_password() {
+            return HttpResponse::Found()
+                .append_header((
+                    "Location",
+                    format!(
+                        "{}/auth_url/{}",
+                        ARGS.public_path_as_str(),
+                        pastas[index].id_as_animals()
+                    ),
+                ))
+                .finish();
+        }
+
         // increment read count
         pastas[index].read_count += 1;
 
@@ -278,6 +295,120 @@ pub async fn redirecturl(data: web::Data<AppState>, id: web::Path<String>) -> Ht
 #[get("/u/{id}")]
 pub async fn shortredirecturl(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
     urlresponse(data, id)
+}
+
+/// `/auth_url/{id}` 密码页提交后的落地处理。
+///
+/// 与 `/url/{id}`、`/u/{id}` 共用同一份「读权限」判定：
+/// 校验 read 密码 → 解密目标地址 → 302 跳转过去。
+/// 密码页是 `/url` 与 `/u` 共用的，表单固定提交到 `/url/{id}`，
+/// 两者最终都跳到同一个目标地址，因此无需为短链另开一个 POST。
+#[post("/url/{id}")]
+pub async fn postredirecturl(
+    data: web::Data<AppState>,
+    id: web::Path<String>,
+    payload: Multipart,
+) -> Result<HttpResponse, Error> {
+    let password = auth::password_from_multipart(payload).await?;
+
+    // get access to the pasta collection
+    let mut pastas = data.pastas.lock().unwrap();
+
+    let id = if ARGS.hash_ids {
+        hashid_to_u64(&id).unwrap_or(0)
+    } else {
+        to_u64(&id.into_inner()).unwrap_or(0)
+    };
+
+    // remove expired pastas (including this one if needed)
+    remove_expired(&mut pastas);
+
+    // find the index of the pasta in the collection based on u64 id
+    let mut index: usize = 0;
+    let mut found: bool = false;
+    for (i, pasta) in pastas.iter().enumerate() {
+        if pasta.id == id {
+            index = i;
+            found = true;
+            break;
+        }
+    }
+
+    if found {
+        // ---- read 权限 ----
+        if pastas[index].read_requires_password()
+            && !auth::verify_read_password(&pastas[index], &password)
+        {
+            return Ok(HttpResponse::Found()
+                .append_header((
+                    "Location",
+                    format!(
+                        "{}/auth_url/{}/incorrect",
+                        ARGS.public_path_as_str(),
+                        pastas[index].id_as_animals()
+                    ),
+                ))
+                .finish());
+        }
+
+        // 只有 url 类型才有可跳转的目标；其它类型走到这里说明是手工构造的请求
+        if pastas[index].pasta_type != "url" {
+            return Ok(HttpResponse::Ok()
+                .content_type("text/html; charset=utf-8")
+                .body(ErrorTemplate { args: &ARGS }.render().unwrap()));
+        }
+
+        // 解密目标地址（仅 read 权限要求密码时正文才是密文）
+        let mut target = pastas[index].content.to_owned();
+        if pastas[index].read_requires_password() && !target.is_empty() {
+            match decrypt(&target, &password) {
+                Ok(plain) => target = plain,
+                Err(_) => {
+                    // 校验已通过却解不开，只可能是数据损坏，按密码错误处理
+                    return Ok(HttpResponse::Found()
+                        .append_header((
+                            "Location",
+                            format!(
+                                "{}/auth_url/{}/incorrect",
+                                ARGS.public_path_as_str(),
+                                pastas[index].id_as_animals()
+                            ),
+                        ))
+                        .finish());
+                }
+            }
+        }
+
+        // increment read count
+        pastas[index].read_count += 1;
+
+        // save the updated read count
+        update(Some(&pastas), Some(&pastas[index]));
+
+        // get current unix time in seconds
+        let timenow: i64 = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(n) => n.as_secs(),
+            Err(_) => {
+                log::error!("SystemTime before UNIX EPOCH!");
+                0
+            }
+        } as i64;
+
+        // update last read time
+        pastas[index].last_read = timenow;
+
+        // save the updated read count
+        update(Some(&pastas), Some(&pastas[index]));
+
+        return Ok(HttpResponse::Found()
+            .append_header(("Location", target))
+            .finish());
+    }
+
+    // otherwise send pasta not found error
+    Ok(HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(ErrorTemplate { args: &ARGS }.render().unwrap()))
 }
 
 #[get("/raw/{id}")]

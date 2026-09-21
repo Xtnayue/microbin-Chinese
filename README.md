@@ -80,7 +80,31 @@ read 密码与 write 密码职责分离：read 密码额外用于加解密正文
 - 新增 `--enable-unlisted`、`--enable-read-password`、`--enable-write-password`
 - 新增 `--default-permissions=read=allow,write=allow,list=yes`（逗号分隔的 `键=值`，键为 `read` / `write` / `list`）
 
-旧的 SQLite 库会在启动时**就地迁移**（`ALTER TABLE ... ADD COLUMN` + 按旧档位映射，幂等），无需手工处理。注意旧的浏览器端加密上传（原 `secret` 档）无法再在浏览器里解密，其正文将保持密文。
+**旧数据无需手工处理**，两个后端都会在读取时自动迁移，且**幂等**（重复启动不会二次迁移，也不会改动已迁移的数据）：
+
+- **SQLite**（默认后端）：启动时用 `ALTER TABLE ... ADD COLUMN` 补齐新列，再按旧档位映射；
+- **JSON**（`--json-db`）：`load_from_file()` 先按通用 JSON 读入，逐条识别并补齐权限字段后再反序列化。
+
+映射规则如下（注意旧代码里「写入需要密码」的判定条件是 `read_only || encrypt_server`，**不是单看 `read_only`**）：
+
+| 旧字段 | 映射到的新权限 |
+| --- | --- |
+| `private` | `list = no`（否则 `yes`） |
+| `encrypt_server` | `read = password`（否则 `allow`） |
+| `read_only` \|\| `encrypt_server` | `write = password`（否则 `allow`） |
+| `encrypted_key` | `read_key` 与 `write_key`（格式相同，直接沿用，因此旧密码仍然有效） |
+
+旧模型没有 `refuse` 这一档，所以迁移不会产生 `write = refuse`。发生迁移时两个后端都会打一条 warn 日志。
+
+注意旧的浏览器端加密上传（原 `secret` 档）无法再在浏览器里解密，其正文将保持密文。
+
+#### 三、顺带修复的上游问题
+
+重构权限模型的过程中发现并修掉了三个上游遗留问题：
+
+1. **JSON 后端忽略 `--data-dir`** —— 上游把数据库路径硬编码成 `pasta_data/database.json`，因此 `--json-db` 下 `--data-dir` 完全不生效；而且只要 `pasta_data/` 不存在，启动阶段就会在创建临时文件时 panic。现已改为与 SQLite 后端一致，跟随 `--data-dir`。
+2. **编辑受密码保护的上传会把明文写回数据库** —— 上游 `post_edit_private` 用解密后的正文覆盖了存储值，导致该上传在首次编辑之后就不再受密码保护。现改为始终用 read 密码重新加密后再落库。
+3. **打包下载受保护的上传会得到无法解密的密文** —— `/archive/{id}` 原先把 `.enc` 密文直接塞进 zip；在去掉浏览器端解密之后这些文件已无意义，现改为校验 read 密码后返回**解密**的内容。
 
 ### 本地构建（Windows）
 
@@ -142,7 +166,7 @@ cargo +stable-x86_64-pc-windows-gnu build --release \
 > ⚠️ `--no-default-features` 会**关闭 SQLite 支持**，运行时必须加 `--json-db` 改用 JSON 后端：
 > `./target/release/microbin.exe --json-db --language zh`
 >
-> 另外 JSON 后端的库路径固定为 `pasta_data/database.json`，**不随 `--data-dir` 变化**，启动前需保证该目录存在（`mkdir -p pasta_data`），否则启动即 panic。
+> JSON 后端的库文件是 `<data-dir>/database.json`，与 SQLite 后端的 `<data-dir>/database.sqlite` 一致，同样跟随 `--data-dir`；数据目录不存在时会在启动阶段自动创建。
 
 ## 自行部署 MicroBin
 

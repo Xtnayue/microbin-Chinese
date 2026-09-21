@@ -3,9 +3,17 @@ use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufWriter};
 
-use crate::Pasta;
+use crate::{Pasta, ARGS};
 
-static DATABASE_PATH: &str = "pasta_data/database.json";
+/// JSON 数据库文件的路径。
+///
+/// 与 SQLite 后端（`{data_dir}/database.sqlite`）保持一致，跟随 `--data-dir`。
+/// 上游此前把这里硬编码成 `pasta_data/database.json`，导致 `--json-db` 下
+/// `--data-dir` 完全不生效；且一旦 `pasta_data/` 不存在，启动阶段就会
+/// 在创建临时文件时 panic。
+fn database_path() -> String {
+    format!("{}/database.json", ARGS.data_dir)
+}
 
 pub fn read_all() -> Vec<Pasta> {
     load_from_file().expect("Failed to load pastas from JSON")
@@ -20,7 +28,8 @@ fn save_to_file(pasta_data: &Vec<Pasta>) {
     // only the new pasta's are lost. Then we replace the current database with
     // the new file. This either succeeds or fails. The database is never left
     // in an undefined state.
-    let tmp_file_path = DATABASE_PATH.to_string() + ".tmp";
+    let database_path = database_path();
+    let tmp_file_path = database_path.clone() + ".tmp";
     let tmp_file = File::create(&tmp_file_path).expect(&format!(
         "failed to create temporary database file for writing. path: {tmp_file_path}"
     ));
@@ -28,7 +37,7 @@ fn save_to_file(pasta_data: &Vec<Pasta>) {
     let writer = BufWriter::new(tmp_file);
     serde_json::to_writer(writer, &pasta_data)
         .expect("Should be able to write out data to database file");
-    std::fs::rename(tmp_file_path, DATABASE_PATH).expect("Could not update database");
+    std::fs::rename(tmp_file_path, database_path).expect("Could not update database");
 }
 
 /// 把旧的「隐私分档」记录就地映射到新的权限列。
@@ -96,7 +105,8 @@ fn migrate_legacy_permissions(value: &mut serde_json::Value) -> bool {
 }
 
 fn load_from_file() -> io::Result<Vec<Pasta>> {
-    let file = File::open(DATABASE_PATH);
+    let database_path = database_path();
+    let file = File::open(&database_path);
     match file {
         Ok(_) => {
             let reader = BufReader::new(file.unwrap());
@@ -132,10 +142,10 @@ fn load_from_file() -> io::Result<Vec<Pasta>> {
             Ok(pastas)
         }
         Err(_) => {
-            log::info!("Database file {} not found!", DATABASE_PATH);
+            log::info!("Database file {database_path} not found!");
             save_to_file(&Vec::<Pasta>::new());
 
-            log::info!("Database file {} created.", DATABASE_PATH);
+            log::info!("Database file {database_path} created.");
             load_from_file()
         }
     }

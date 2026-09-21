@@ -52,11 +52,25 @@ fn pastaresponse(
     }
 
     if found {
-        if pastas[index].encrypt_server && password == *"" {
+        // ---- read 权限 ----
+        // 要求密码却没提供 → 引导到密码页
+        if pastas[index].read_requires_password() && password.is_empty() {
             return HttpResponse::Found()
                 .append_header((
                     "Location",
                     format!("{}/auth/{}", ARGS.public_path_as_str(), pastas[index].id_as_animals()),
+                ))
+                .finish();
+        }
+
+        // 提供了密码就校验；不通过则回到密码页并标记错误
+        if pastas[index].read_requires_password()
+            && !auth::verify_read_password(&pastas[index], &password)
+        {
+            return HttpResponse::Found()
+                .append_header((
+                    "Location",
+                    format!("{}/auth/{}/incorrect", ARGS.public_path_as_str(), pastas[index].id_as_animals()),
                 ))
                 .finish();
         }
@@ -71,20 +85,10 @@ fn pastaresponse(
 
         let original_content = pastas[index].content.to_owned();
 
-        // decrypt content temporarily
-        if password != *"" && !original_content.is_empty() {
-            let res = decrypt(&original_content, &password);
-            if let Ok(..) = res {
-                pastas[index]
-                    .content
-                    .replace_range(.., res.unwrap().as_str());
-            } else {
-                return HttpResponse::Found()
-                    .append_header((
-                        "Location",
-                        format!("{}/auth/{}/incorrect", ARGS.public_path_as_str(), pastas[index].id_as_animals()),
-                    ))
-                    .finish();
+        // 校验通过后解密正文（仅 read 权限要求密码时正文才是密文）
+        if pastas[index].read_requires_password() && !original_content.is_empty() {
+            if let Ok(plain) = decrypt(&original_content, &password) {
+                pastas[index].content.replace_range(.., plain.as_str());
             }
         }
 
@@ -305,7 +309,7 @@ pub async fn getrawpasta(
     }
 
     if found {
-        if pastas[index].encrypt_server {
+        if pastas[index].read_requires_password() {
             return Ok(HttpResponse::Found()
                 .append_header((
                     "Location",
@@ -378,11 +382,23 @@ pub async fn postrawpasta(
     }
 
     if found {
-        if pastas[index].encrypt_server && password == *"" {
+        // ---- read 权限 ----
+        if pastas[index].read_requires_password() && password.is_empty() {
             return Ok(HttpResponse::Found()
                 .append_header((
                     "Location",
                     format!("{}/auth/{}", ARGS.public_path_as_str(), pastas[index].id_as_animals()),
+                ))
+                .finish());
+        }
+
+        if pastas[index].read_requires_password()
+            && !auth::verify_read_password(&pastas[index], &password)
+        {
+            return Ok(HttpResponse::Found()
+                .append_header((
+                    "Location",
+                    format!("{}/auth/{}/incorrect", ARGS.public_path_as_str(), pastas[index].id_as_animals()),
                 ))
                 .finish());
         }
@@ -395,20 +411,10 @@ pub async fn postrawpasta(
 
         let original_content = pastas[index].content.to_owned();
 
-        // decrypt content temporarily
-        if password != *"" {
-            let res = decrypt(&original_content, &password);
-            if res.is_ok() {
-                pastas[index]
-                    .content
-                    .replace_range(.., res.unwrap().as_str());
-            } else {
-                return Ok(HttpResponse::Found()
-                    .append_header((
-                        "Location",
-                        format!("{}/auth/{}/incorrect", ARGS.public_path_as_str(), pastas[index].id_as_animals()),
-                    ))
-                    .finish());
+        // 校验通过后解密正文
+        if pastas[index].read_requires_password() && !original_content.is_empty() {
+            if let Ok(plain) = decrypt(&original_content, &password) {
+                pastas[index].content.replace_range(.., plain.as_str());
             }
         }
 

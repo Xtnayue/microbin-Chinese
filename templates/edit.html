@@ -9,17 +9,29 @@
         !="incorrect" %} autofocus {% endif %}>{{ pasta.content_textarea_safe() }}</textarea>
     <br>
     <div>
-        {% if pasta.readonly || pasta.encrypt_server %}
-        <div style="float: left; height: 90px;">
-            <label for="password">{{ "Re-enter Password"|t }}<sup><a href="{{ args.public_path_as_str() }}/guide#password">?</a></sup></label><br>
+        {% if pasta.read_requires_password() %}
+        <div style="float: left; height: 90px; margin-right: 20px;">
+            <label for="read_password">{{ "Read password"|t }}<sup><a
+                        href="{{ args.public_path_as_str() }}/guide#read">?</a></sup></label><br>
             <input {% if status=="incorrect" %} autofocus {% endif %} style="width: 130px; height: 28px;"
-                type="password" id="password" name="password" autocomplete="off" />
-            {% if status == "incorrect" %}
-            <p>{{ "Incorrect password."|t }}</p>
-            {% endif %}
+                type="password" id="read_password" name="read_password" autocomplete="off" />
         </div>
         {% endif %}
 
+        {% if pasta.write_requires_password() %}
+        <div style="float: left; height: 90px;">
+            <label for="write_password">{{ "Write password"|t }}<sup><a
+                        href="{{ args.public_path_as_str() }}/guide#write">?</a></sup></label><br>
+            <input {% if status=="incorrect" %} autofocus {% endif %} style="width: 130px; height: 28px;"
+                type="password" id="write_password" name="write_password" autocomplete="off" />
+        </div>
+        {% endif %}
+
+        {% if status == "incorrect" %}
+        <div style="float: left; height: 90px; margin-left: 20px;">
+            <p>{{ "Incorrect password."|t }}</p>
+        </div>
+        {% endif %}
 
         <div style="float: right; height: 90px; justify-content: end;">
             <label for="password_field"></label><br>

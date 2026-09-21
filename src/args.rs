@@ -6,6 +6,7 @@ use std::fmt;
 use std::net::IpAddr;
 use std::str::FromStr;
 use crate::fs;
+use crate::pasta::{ReadAccess, WriteAccess};
 
 lazy_static! {
     pub static ref ARGS: Args = Args::parse_localized();
@@ -68,8 +69,9 @@ pub struct Args {
     #[clap(short, long, env="MICROBIN_BIND", default_value_t = IpAddr::from([0, 0, 0, 0]))]
     pub bind: IpAddr,
 
-    #[clap(long, env = "MICROBIN_PRIVATE", action = clap::ArgAction::Set, default_value_t = true)]
-    pub private: bool,
+    /// 是否允许把上传的 `list` 权限设为 `no`（即不出现在公开列表中）。
+    #[clap(long, env = "MICROBIN_ENABLE_UNLISTED", action = clap::ArgAction::Set, default_value_t = true)]
+    pub enable_unlisted: bool,
 
     #[clap(long, env = "MICROBIN_PURE_HTML")]
     pub pure_html: bool,
@@ -116,8 +118,13 @@ pub struct Args {
     #[clap(long, env = "MICROBIN_ETERNAL_PASTA")]
     pub eternal_pasta: bool,
 
-    #[clap(long, env = "MICROBIN_ENABLE_READONLY", action = clap::ArgAction::Set, default_value_t = true)]
-    pub enable_readonly: bool,
+    /// 是否允许把上传的 `write` 权限设为 `password`。
+    #[clap(long, env = "MICROBIN_ENABLE_WRITE_PASSWORD", action = clap::ArgAction::Set, default_value_t = true)]
+    pub enable_write_password: bool,
+
+    /// 是否允许把上传的 `read` 权限设为 `password`。
+    #[clap(long, env = "MICROBIN_ENABLE_READ_PASSWORD", action = clap::ArgAction::Set, default_value_t = true)]
+    pub enable_read_password: bool,
 
     #[clap(long, env = "MICROBIN_DEFAULT_EXPIRY", default_value = "24hour")]
     pub default_expiry: String,
@@ -146,14 +153,10 @@ pub struct Args {
     #[clap(long, env = "MICROBIN_DISABLE_UPDATE_CHECKING")]
     pub disable_update_checking: bool,
 
-    #[clap(long, env = "MICROBIN_ENCRYPTION_CLIENT_SIDE", action = clap::ArgAction::Set, default_value_t = true)]
-    pub encryption_client_side: bool,
-
-    #[clap(long, env = "MICROBIN_ENCRYPTION_SERVER_SIDE", action = clap::ArgAction::Set, default_value_t = true)]
-    pub encryption_server_side: bool,
-
-    #[clap(long, env = "MICROBIN_DEFAULT_PRIVACY")]
-    pub default_privacy: Option<String>,
+    /// 新建上传时的默认权限组合，逗号分隔的 `键=值`，例如
+    /// `read=allow,write=password,list=no`。
+    #[clap(long, env = "MICROBIN_DEFAULT_PERMISSIONS", default_value = "read=allow,write=allow,list=yes")]
+    pub default_permissions: String,
 
     #[clap(
         long,
@@ -218,6 +221,34 @@ impl Args {
         options.iter().position(|&x| x == self.max_expiry).unwrap_or(5)
     }
 
+    /// 解析 `--default-permissions`，得到新建上传时的默认权限组合。
+    ///
+    /// 语法为逗号分隔的 `键=值`，键为 `read` / `write` / `list`（`listed` 亦可）。
+    /// 未出现的键保留默认值；值无法识别时取该项最保守的一档。
+    pub fn default_permissions(&self) -> DefaultPermissions {
+        let mut parsed = DefaultPermissions::default();
+
+        for part in self.default_permissions.split(',') {
+            let Some((key, value)) = part.split_once('=') else {
+                continue;
+            };
+
+            match key.trim().to_ascii_lowercase().as_str() {
+                "read" => parsed.read = ReadAccess::from_form(value),
+                "write" => parsed.write = WriteAccess::from_form(value),
+                "list" | "listed" => {
+                    parsed.listed = !matches!(
+                        value.trim().to_ascii_lowercase().as_str(),
+                        "no" | "false" | "off"
+                    )
+                }
+                _ => {}
+            }
+        }
+
+        parsed
+    }
+
     pub fn without_secrets(self) -> Args {
         Args {
             auth_basic_username: None,
@@ -233,7 +264,7 @@ impl Args {
             highlightsyntax: self.highlightsyntax,
             port: self.port,
             bind: self.bind,
-            private: self.private,
+            enable_unlisted: self.enable_unlisted,
             pure_html: self.pure_html,
             json_db: self.json_db,
             public_path: self.public_path,
@@ -250,7 +281,8 @@ impl Args {
             wide: self.wide,
             qr: self.qr,
             eternal_pasta: self.eternal_pasta,
-            enable_readonly: self.enable_readonly,
+            enable_write_password: self.enable_write_password,
+            enable_read_password: self.enable_read_password,
             default_expiry: self.default_expiry,
             max_expiry: self.max_expiry,
             data_dir: String::from(""),
@@ -258,9 +290,7 @@ impl Args {
             custom_css: self.custom_css,
             hash_ids: self.hash_ids,
             disable_telemetry: self.disable_telemetry,
-            encryption_client_side: self.encryption_client_side,
-            encryption_server_side: self.encryption_server_side,
-            default_privacy: None,
+            default_permissions: self.default_permissions,
             max_file_size_encrypted_mb: self.max_file_size_encrypted_mb,
             max_file_size_unencrypted_mb: self.max_file_size_unencrypted_mb,
             disable_update_checking: self.disable_update_checking,
@@ -271,9 +301,26 @@ impl Args {
     }
 }
 
+/// `--default-permissions` 的解析结果：新建上传时预选的权限组合。
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct DefaultPermissions {
+    pub read: ReadAccess,
+    pub write: WriteAccess,
+    pub listed: bool,
+}
+
+impl Default for DefaultPermissions {
+    fn default() -> Self {
+        Self {
+            read: ReadAccess::Allow,
+            write: WriteAccess::Allow,
+            listed: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct PublicUrl(pub String);
-
 impl fmt::Display for PublicUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)

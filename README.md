@@ -47,9 +47,40 @@ microbin
 
 欢迎继续补充翻译：在 `src/i18n.rs` 的 `ZH` 表中增加条目即可。
 
-### 上游功能改动
+### 相对上游的功能改动
 
-除界面文案外，本分支不修改上游的任何业务逻辑，仅新增了 `--language` 参数与 `src/i18n.rs`。
+本分支基于上游 [`szabodanika/microbin`](https://github.com/szabodanika/microbin) v2.1.4，做了两类改动。
+
+#### 一、中英双语界面
+
+新增 `--language` 参数与 `src/i18n.rs` 翻译表，模板与服务端提示、CLI 帮助均支持 `en` / `zh` 切换。详见上文「关于简体中文版」。
+
+#### 二、权限模型重构
+
+废弃原先固定搭配的五档「隐私级别」（`public` / `unlisted` / `readonly` / `private` / `secret`），改为三项**相互独立、可单独授予**的权限项：
+
+| 权限 | 取值 | 含义 | 作用范围 |
+| --- | --- | --- | --- |
+| `read` | `allow` / `password` | 谁能看到内容。取 `password` 时正文与全部附件在服务端以该密码加密存储 | `/upload/{id}`、`/raw/{id}`、`/file/{id}`、`/archive/{id}`、编辑页 |
+| `write` | `allow` / `password` / `refuse` | 谁能修改或删除。`password` 只做授权判定，**不参与加密**；`refuse` 一律拒绝（管理员密码仍可删除） | 保存编辑、`/remove/{id}`、页面上「编辑 / 删除」入口的显示 |
+| `list` | `yes` / `no` | 是否出现在公开的 `/list` 列表页 | 仅 `/list` |
+
+同时**去掉了浏览器端加密**（原 `secret` 档），只保留服务端加密。
+
+权限密码不落库：落库的是校验值 `encrypt(上传 id, 密码)`；校验时用提交上来的密码解密该值，结果恰好等于该上传的 id 即视为通过。这样做的两个好处：
+
+1. 与正文是否为空无关 —— 修复了原模型下「纯附件上传（正文为空）无法校验密码」的问题；
+2. 校验开销与内容大小无关，不必真的去解密正文。
+
+read 密码与 write 密码职责分离：read 密码额外用于加解密正文与附件，write 密码只回答「是否允许写入」。二者彼此独立，可以相同也可以不同。详见 `/guide` 页面（`#read`、`#write`、`#list`、`#password` 四个锚点）。
+
+相关的命令行参数也随之调整：
+
+- 移除 `--private`、`--enable-readonly`、`--default-privacy`、`--encryption-client-side`、`--encryption-server-side`
+- 新增 `--enable-unlisted`、`--enable-read-password`、`--enable-write-password`
+- 新增 `--default-permissions=read=allow,write=allow,list=yes`（逗号分隔的 `键=值`，键为 `read` / `write` / `list`）
+
+旧的 SQLite 库会在启动时**就地迁移**（`ALTER TABLE ... ADD COLUMN` + 按旧档位映射，幂等），无需手工处理。注意旧的浏览器端加密上传（原 `secret` 档）无法再在浏览器里解密，其正文将保持密文。
 
 ### 本地构建（Windows）
 
@@ -139,7 +170,7 @@ microbin
 ## 功能特性
 
 - 完全自包含的可执行文件，MicroBin 只有一个文件！
-- 服务端与客户端端到端加密
+- 服务端加密：`read` 权限要求密码时，正文与附件都以该密码加密存储
 - 文件上传（例如 `server.com/file/pig-dog-cat`）
 - 原始文本直出（例如 `server.com/raw/pig-dog-cat`）
 - 二维码支持
@@ -147,7 +178,7 @@ microbin
 - 用动物名称代替随机数字作为上传标识（共 64 种动物）
 - 支持多个附件
 - 支持 SQLite 与 JSON 两种数据库
-- 上传内容可设为公开或私有、可编辑或不可编辑、自动过期或永不过期
+- 三项相互独立的权限（`read` / `write` / `list`），可自由组合
 - 自动深色模式，仅用极少量 CSS 与原生 JS 即可自定义样式（见 [`water.css`](https://github.com/kognise/water.css)）
 - 以及更多！
 

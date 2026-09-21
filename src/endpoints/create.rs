@@ -1,9 +1,10 @@
-use crate::pasta::{Pasta, PastaFile};
+use crate::args::{Args, DefaultPermissions, ARGS};
+use crate::pasta::{Pasta, PastaFile, ReadAccess, WriteAccess};
 use crate::util::animalnumbers::to_animal_names;
+use crate::util::auth;
 use crate::util::db::insert;
 use crate::util::hashids::to_hashids;
 use crate::util::misc::{encrypt, encrypt_file, is_valid_url};
-use crate::args::{Args, ARGS};
 use crate::AppState;
 use actix_multipart::Multipart;
 use actix_web::error::ErrorBadRequest;
@@ -24,7 +25,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 struct IndexTemplate<'a> {
     args: &'a Args,
     status: String,
-    default_privacy_value: String,
+    default_permissions: DefaultPermissions,
     max_expiry_index: usize,
 }
 
@@ -34,7 +35,7 @@ pub async fn index() -> impl Responder {
         IndexTemplate {
             args: &ARGS,
             status: String::from(""),
-            default_privacy_value: ARGS.default_privacy.as_ref().map_or_else(|| String::from("public"), |s| s.clone()),
+            default_permissions: ARGS.default_permissions(),
             max_expiry_index: ARGS.max_expiry_index(),
         }
         .render()
@@ -50,7 +51,7 @@ pub async fn index_with_status(param: web::Path<String>) -> HttpResponse {
         IndexTemplate {
             args: &ARGS,
             status,
-            default_privacy_value: ARGS.default_privacy.as_ref().map_or_else(|| String::from("public"), |s| s.clone()),
+            default_permissions: ARGS.default_permissions(),
             max_expiry_index: ARGS.max_expiry_index(),
         }
         .render()
@@ -127,12 +128,12 @@ pub async fn create(
         content: String::from(""),
         file: None,
         extension: String::from(""),
-        private: false,
-        readonly: false,
+        read_access: ReadAccess::Allow,
+        write_access: WriteAccess::Allow,
+        listed: true,
+        read_key: None,
+        write_key: None,
         editable: ARGS.editable,
-        encrypt_server: false,
-        encrypted_key: Some(String::from("")),
-        encrypt_client: false,
         created: timenow,
         read_count: 0,
         burn_after_reads: 0,
@@ -142,8 +143,9 @@ pub async fn create(
         attachments: None,
     };
 
-    let mut random_key: String = String::from("");
-    let mut plain_key: String = String::from("");
+    // 两个权限各自的密码。密码本身不落库，落库的是由 id 派生的校验值。
+    let mut read_password = String::from("");
+    let mut write_password = String::from("");
     let mut uploader_password = String::from("");
 
     while let Some(mut field) = payload.try_next().await? {
@@ -158,44 +160,37 @@ pub async fn create(
                 }
                 continue;
             }
-            "random_key" => {
+            "read_access" => {
                 while let Some(chunk) = field.try_next().await? {
-                    random_key = std::str::from_utf8(&chunk).unwrap().to_string();
+                    new_pasta.read_access =
+                        ReadAccess::from_form(std::str::from_utf8(&chunk).unwrap());
                 }
                 continue;
             }
-            "privacy" => {
+            "read_password" => {
                 while let Some(chunk) = field.try_next().await? {
-                    let privacy = std::str::from_utf8(&chunk).unwrap();
-                    new_pasta.private = match privacy {
-                        "public" => false,
-                        _ => true,
-                    };
-                    new_pasta.readonly = match privacy {
-                        "readonly" if ARGS.enable_readonly => true,
-                        _ => false,
-                    };
-                    new_pasta.encrypt_client = match privacy {
-                        "secret" => true,
-                        _ => false,
-                    };
-                    new_pasta.encrypt_server = match privacy {
-                        "private" => true,
-                        "secret" => true,
-                        _ => false,
-                    };
-                }
-            }
-            "plain_key" => {
-                while let Some(chunk) = field.try_next().await? {
-                    plain_key = std::str::from_utf8(&chunk).unwrap().to_string();
+                    read_password.push_str(std::str::from_utf8(&chunk).unwrap());
                 }
                 continue;
             }
-            "encrypted_random_key" => {
+            "write_access" => {
                 while let Some(chunk) = field.try_next().await? {
-                    new_pasta.encrypted_key =
-                        Some(std::str::from_utf8(&chunk).unwrap().to_string());
+                    new_pasta.write_access =
+                        WriteAccess::from_form(std::str::from_utf8(&chunk).unwrap());
+                }
+                continue;
+            }
+            "write_password" => {
+                while let Some(chunk) = field.try_next().await? {
+                    write_password.push_str(std::str::from_utf8(&chunk).unwrap());
+                }
+                continue;
+            }
+            "listed" => {
+                while let Some(chunk) = field.try_next().await? {
+                    let value = std::str::from_utf8(&chunk).unwrap().trim().to_ascii_lowercase();
+                    // 无法识别的取值一律按「不列出」处理
+                    new_pasta.listed = matches!(value.as_str(), "yes" | "on" | "true" | "1");
                 }
                 continue;
             }
@@ -295,7 +290,7 @@ pub async fn create(
                 let mut size = 0;
                 while let Some(chunk) = field.try_next().await? {
                     size += chunk.len();
-                    if (new_pasta.encrypt_server
+                    if (new_pasta.read_access == ReadAccess::Password
                         && size > ARGS.max_file_size_encrypted_mb * 1024 * 1024)
                         || size > ARGS.max_file_size_unencrypted_mb * 1024 * 1024
                     {
@@ -334,19 +329,35 @@ pub async fn create(
 
     let id = new_pasta.id;
 
-    if plain_key != *"" && new_pasta.readonly {
-        new_pasta.encrypted_key = Some(encrypt(id.to_string().as_str(), &plain_key));
-    }
-
-    if new_pasta.encrypt_server && !new_pasta.readonly && new_pasta.content != *"" {
-        if new_pasta.encrypt_client {
-            new_pasta.content = encrypt(&new_pasta.content, &random_key);
-        } else {
-            new_pasta.content = encrypt(&new_pasta.content, &plain_key);
+    // ---- 应用三项权限 ----
+    // read 权限：声明要密码却没给密码时，绝不静默降级为公开，直接拒绝。
+    if new_pasta.read_access == ReadAccess::Password {
+        if read_password.is_empty() {
+            return Err(ErrorBadRequest(crate::i18n::tr(
+                "Read permission requires a password.",
+            )));
         }
+        new_pasta.read_key = Some(auth::permission_key(id, &read_password));
     }
 
-    if new_pasta.encrypt_server && !new_pasta.readonly {
+    // write 权限：只生成校验值，不参与任何内容加密。
+    if new_pasta.write_access == WriteAccess::Password {
+        if write_password.is_empty() {
+            return Err(ErrorBadRequest(crate::i18n::tr(
+                "Write permission requires a password.",
+            )));
+        }
+        new_pasta.write_key = Some(auth::permission_key(id, &write_password));
+    }
+
+    // ---- 按 read 权限加密正文与附件 ----
+    let read_protected = new_pasta.read_access == ReadAccess::Password;
+
+    if read_protected && !new_pasta.content.is_empty() {
+        new_pasta.content = encrypt(&new_pasta.content, &read_password);
+    }
+
+    if read_protected {
         let mut files_to_encrypt: Vec<&PastaFile> = Vec::new();
         if let Some(file) = &new_pasta.file {
             files_to_encrypt.push(file);
@@ -358,21 +369,16 @@ pub async fn create(
         }
 
         for file in files_to_encrypt {
-             let filepath = format!(
+            let filepath = format!(
                 "{}/attachments/{}/{}",
                 ARGS.data_dir,
                 &new_pasta.id_as_animals(),
                 &file.name()
             );
-            if new_pasta.encrypt_client {
-                encrypt_file(&random_key, &filepath).expect("Failed to encrypt file with random key")
-            } else {
-                encrypt_file(&plain_key, &filepath).expect("Failed to encrypt file with plain key")
-            }
+            encrypt_file(&read_password, &filepath)
+                .expect("Failed to encrypt file with the read password")
         }
     }
-
-    let encrypt_server = new_pasta.encrypt_server;
 
     {
         let mut pastas = data.pastas.lock().unwrap();
@@ -391,7 +397,8 @@ pub async fn create(
         to_animal_names(id)
     };
 
-    if encrypt_server {
+    // read 权限要求密码时，直接引导用户去密码页；否则直接进详情页。
+    if read_protected {
         Ok(HttpResponse::Found()
             .append_header(("Location", format!("{}/auth/{}/success", ARGS.public_path_as_str(), slug)))
             .finish())

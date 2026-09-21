@@ -124,6 +124,7 @@ async fn main() -> std::io::Result<()> {
             .service(qr::getqr)
             .service(file::get_file)
             .service(archive::get_archive)
+            .service(archive::post_archive)
             .service(file::post_secure_file)
             .service(static_resources::static_resources)
             .service(guide::guide)

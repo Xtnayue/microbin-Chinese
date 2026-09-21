@@ -188,41 +188,49 @@
         <input type="hidden" name="syntax_highlight" value="none">
         {%- endif %}
 
-        {% if args.encryption_client_side || args.encryption_server_side || args.enable_readonly || args.private %}
+        {# ---- 三项相互独立的权限 ---- #}
         <div>
-            <label for="privacy">{{ "Privacy"|t }}<sup> <a href="{{ args.public_path_as_str() }}/guide#privacy">?</a></sup></label><br>
-            <select style="width: 100%;" name="privacy" id="privacy">
-                <optgroup label="{{ "Unencrypted (no password)"|t }}">
-                    <option value="public"{% if default_privacy_value == "public" %} selected{% endif %}>{{ "Public"|t }}</option>
-                    {% if args.private %}
-                    <option value="unlisted"{% if default_privacy_value == "unlisted" %} selected{% endif %}>{{ "Unlisted"|t }}</option>
-                    {%- endif %}
-                </optgroup>
-                {% if args.enable_readonly %}
-                <optgroup label="{{ "Unencrypted (protected)"|t }}">
-                    <option value="readonly"{% if default_privacy_value == "readonly" %} selected{% endif %}>{{ "Read-only"|t }}</option>
-                </optgroup>
+            <label for="read_access">{{ "Read permission"|t }}<sup> <a href="{{ args.public_path_as_str() }}/guide#read">?</a></sup></label><br>
+            <select style="width: 100%;" name="read_access" id="read_access">
+                <option value="allow"{% if default_permissions.read.as_str() == "allow" %} selected{% endif %}>{{ "Anyone (no password)"|t }}</option>
+                {% if args.enable_read_password %}
+                <option value="password"{% if default_permissions.read.as_str() == "password" %} selected{% endif %}>{{ "Requires a password"|t }}</option>
                 {%- endif %}
-                {% if args.encryption_client_side || args.encryption_server_side %}
-                <optgroup label="{{ "Encrypted"|t }}">
-                    {% if args.encryption_server_side %}
-                    <option value="private"{% if default_privacy_value == "private" %} selected{% endif %}>{{ "Private"|t }}</option>
-                    {%- endif %}
-                    {% if args.encryption_client_side%}
-                    <option value="secret"{% if default_privacy_value == "secret" %} selected{% endif %}>{{ "Secret"|t }}</option>
-                    {%- endif %}
-                </optgroup>
+            </select>
+            {% if args.enable_read_password %}
+            <div id="read-password-row" style="margin-top: 0.3rem;">
+                <label for="read_password">{{ "Read password"|t }}</label><br>
+                <input style="width: 130px; height: 28px;" type="password" id="read_password" name="read_password" autocomplete="off" />
+            </div>
+            {%- endif %}
+        </div>
+
+        <div style="margin-top: 0.6rem;">
+            <label for="write_access">{{ "Write permission"|t }}<sup> <a href="{{ args.public_path_as_str() }}/guide#write">?</a></sup></label><br>
+            <select style="width: 100%;" name="write_access" id="write_access">
+                <option value="allow"{% if default_permissions.write.as_str() == "allow" %} selected{% endif %}>{{ "Anyone (no password)"|t }}</option>
+                {% if args.enable_write_password %}
+                <option value="password"{% if default_permissions.write.as_str() == "password" %} selected{% endif %}>{{ "Requires a password"|t }}</option>
+                {%- endif %}
+                <option value="refuse"{% if default_permissions.write.as_str() == "refuse" %} selected{% endif %}>{{ "Refused (cannot be modified or removed)"|t }}</option>
+            </select>
+            {% if args.enable_write_password %}
+            <div id="write-password-row" style="margin-top: 0.3rem;">
+                <label for="write_password">{{ "Write password"|t }}</label><br>
+                <input style="width: 130px; height: 28px;" type="password" id="write_password" name="write_password" autocomplete="off" />
+            </div>
+            {%- endif %}
+        </div>
+
+        <div style="margin-top: 0.6rem;">
+            <label for="listed">{{ "List permission"|t }}<sup> <a href="{{ args.public_path_as_str() }}/guide#list">?</a></sup></label><br>
+            <select style="width: 100%;" name="listed" id="listed">
+                <option value="yes"{% if default_permissions.listed %} selected{% endif %}>{{ "Listed publicly"|t }}</option>
+                {% if args.enable_unlisted %}
+                <option value="no"{% if !default_permissions.listed %} selected{% endif %}>{{ "Not listed"|t }}</option>
                 {%- endif %}
             </select>
         </div>
-        {%- endif %}
-
-        {% if args.encryption_client_side || args.encryption_server_side || args.enable_readonly %}
-        <div>
-            <label for="password_field">{{ "Password"|t }}<sup><a href="{{ args.public_path_as_str() }}/guide#password">?</a></sup></label><br>
-            <input style="width: 130px; height: 28px;" type="password" id="password_field" autocomplete="off" />
-        </div>
-        {%- endif %}
 
     </div>
 
@@ -257,32 +265,36 @@
     </div>
 
     <input type="hidden" name="content" id="content">
-    <input type="hidden" name="encrypt_client" id="encrypt_client">
-    {% if args.encryption_server_side || args.enable_readonly %}
-    <input name="encrypted_random_key" type="hidden" id="encrypted_random_key" autocomplete="off" />
-    {%- endif %}
-    <input type="hidden" name="random_key" id="random_key">
-    <input type="hidden" name="plain_key" id="plain_key">
 </form>
 <br>
 <br>
-<script type="text/javascript" src="{{ args.public_path_as_str() }}/static/jszip.min.js"></script>
 <script>
     const form = document.getElementById("pasta-form");
     const submitButton = document.getElementById("submit-button");
-    const passwordField = document.getElementById("password_field");
-    const privacyDropdown = document.getElementById("privacy");
+    const readAccessDropdown = document.getElementById("read_access");
+    const writeAccessDropdown = document.getElementById("write_access");
+    const readPasswordField = document.getElementById("read_password");
+    const writePasswordField = document.getElementById("write_password");
     const contentInput = document.getElementById("content-input");
     const content = document.getElementById("content");
     const attachFileButton = document.getElementById('attach-file-button');
     const dropContainer = document.getElementById('pasta-form');
     const hiddenFileButton = document.getElementById('file');
-    const hiddenRandomKeyField = document.getElementById("random_key");
-    const hiddenEncryptedRandomKeyField = document.getElementById("encrypted_random_key");
-    const hiddenPlainKeyField = document.getElementById("plain_key");
-    const hiddenEncryptedClientSide = document.getElementById("encrypt_client");
 
-    const te = new TextEncoder();
+    {# 只有把权限选成「需要密码」时，才显示对应的密码输入框 #}
+    function syncPasswordRows() {
+        const readRow = document.getElementById("read-password-row");
+        if (readRow && readAccessDropdown) {
+            readRow.style.display = readAccessDropdown.value === "password" ? "" : "none";
+        }
+        const writeRow = document.getElementById("write-password-row");
+        if (writeRow && writeAccessDropdown) {
+            writeRow.style.display = writeAccessDropdown.value === "password" ? "" : "none";
+        }
+    }
+    if (readAccessDropdown) readAccessDropdown.addEventListener("change", syncPasswordRows);
+    if (writeAccessDropdown) writeAccessDropdown.addEventListener("change", syncPasswordRows);
+    syncPasswordRows();
 
     form.onsubmit = async function (event) {
         event.preventDefault(); // prevent default form submission
@@ -291,53 +303,19 @@
             if (fileOversized()) return false;
         // {%- endif %}
 
-        // {% if args.encryption_client_side || args.encryption_server_side || args.enable_readonly %}
-        if (passwordField.value.trim() != "") {
-            if (privacyDropdown.value == "secret") {
-                submitButton.disabled = true;
-                submitButton.value = 'Encrypting...';
-                // Yield to UI to allow text update
-                await new Promise(r => setTimeout(r, 10));
-
-                let randomKey = Array.from(Array(16), () => Math.floor(Math.random() * 36).toString(36)).join('');
-                hiddenRandomKeyField.value = randomKey;
-                hiddenEncryptedRandomKeyField.value = encryptWithPassword(passwordField.value, randomKey);
-                if (contentInput.value.trim() != "") {
-                    content.value = encryptWithPassword(passwordField.value.trim(), contentInput.value);
-                } else {
-                    content.value = contentInput.value;
-                }
-                hiddenPlainKeyField.name = "";
-                // {% if !args.no_file_upload %}
-                await encryptFile();
-                // {%- endif %}
-            } else {
-                hiddenPlainKeyField.value = passwordField.value;
-                hiddenEncryptedClientSide.name = "";
-                hiddenEncryptedRandomKeyField.name = "";
-                hiddenRandomKeyField.name = "";
-                content.value = contentInput.value;
-                // {% if !args.no_file_upload %}
-                if (privacyDropdown.value == "private" && hiddenFileButton.files.length > 1) {
-                    submitButton.disabled = true;
-                    submitButton.value = 'Zipping...';
-                    await new Promise(r => setTimeout(r, 10));
-                    await zipFiles();
-                }
-                // {%- endif %}
-            }
-        } else {
-            if (privacyDropdown.value != "public" && privacyDropdown.value != "unlisted") {
-                passwordField.focus();
-                return false;
-            }
-            hiddenEncryptedClientSide.name = "";
-            content.value = contentInput.value;
+        {# 选了「需要密码」就必须填写密码；服务端会再校验一次 #}
+        if (readAccessDropdown && readAccessDropdown.value === "password"
+            && readPasswordField.value.trim() === "") {
+            readPasswordField.focus();
+            return false;
         }
-        // {%- else %}
-        hiddenEncryptedClientSide.name = "";
+        if (writeAccessDropdown && writeAccessDropdown.value === "password"
+            && writePasswordField.value.trim() === "") {
+            writePasswordField.focus();
+            return false;
+        }
+
         content.value = contentInput.value;
-        // {%- endif %}
 
         if (contentInput.value.trim() == "" && (hiddenFileButton == undefined || hiddenFileButton.files.length == 0)) {
             contentInput.focus();
@@ -381,28 +359,14 @@
         }, 1000);
     };
 
-    function encryptWithPassword(password, plaintext) {
-        const passwordBytes = aesjs.utils.utf8.toBytes(password.padStart(32, "#"));
-        const plaintextBytes = aesjs.utils.utf8.toBytes(plaintext + "!0K");
-        const aesCtr = new aesjs.ModeOfOperation.ctr(passwordBytes);
-        const encryptedBytes = aesCtr.encrypt(plaintextBytes);
-        return aesjs.utils.hex.fromBytes(encryptedBytes);
-    }
-
     // {% if !args.no_file_upload %}
-    function encryptFileWithPassword(password, bytes) {
-        const passwordBytes = aesjs.utils.utf8.toBytes(password.padStart(32, "#"));
-        const aesCtr = new aesjs.ModeOfOperation.ctr(passwordBytes);
-        const encryptedBytes = aesCtr.encrypt(bytes);
-        return aesjs.utils.hex.fromBytes(encryptedBytes);
-    }
-
     function fileOversized() {
         if (hiddenFileButton.files.length > 0) {
             const fileSize = hiddenFileButton.files.item(0).size;
             const fileSizeMb = fileSize / 1024 ** 2;
 
-            if (privacyDropdown?.value == "secret") {
+            {# read 权限要密码时，正文与附件都要加密，限额更严 #}
+            if (readAccessDropdown?.value === "password") {
                 if (fileSizeMb >
                     parseInt("{{ args.max_file_size_encrypted_mb }}")) {
                     attachFileButton.textContent = "{{ "Please select a file smaller than"|t }} {{ args.max_file_size_encrypted_mb }} MB";
@@ -419,100 +383,6 @@
             }
         }
         return false;
-    }
-
-    function encryptFile() {
-        return new Promise((resolve, reject) => {
-            if (hiddenFileButton.files.length > 0) {
-                // If multiple files and encrypting, zip them first
-                if (hiddenFileButton.files.length > 1) {
-                     const zip = new JSZip();
-                     const promises = [];
-
-                     for (let i = 0; i < hiddenFileButton.files.length; i++) {
-                        const file = hiddenFileButton.files[i];
-                        const promise = new Promise((fileResolve, fileReject) => {
-                            const reader = new FileReader();
-                            reader.onload = function(event) {
-                                zip.file(file.name, event.target.result);
-                                fileResolve();
-                            };
-                            reader.readAsArrayBuffer(file);
-                        });
-                        promises.push(promise);
-                     }
-
-                     Promise.all(promises).then(() => {
-                        zip.generateAsync({type:"blob"}).then((content) => {
-                            content.arrayBuffer().then((buffer) => {
-                                const encryptedContents = encryptFileWithPassword(passwordField.value.trim(), new Uint8Array(buffer));
-                                const encryptedFile = new File([encryptedContents], "archive.zip.enc", { type: "application/octet-stream" });
-                                
-                                let container = new DataTransfer();
-                                container.items.add(encryptedFile);
-                                hiddenFileButton.files = container.files;
-                                resolve();
-                            });
-                        });
-                     });
-
-                } else {
-                    // Single file logic
-                    let container = new DataTransfer();
-                    let promises = [];
-
-                    for (let i = 0; i < hiddenFileButton.files.length; i++) {
-                        const file = hiddenFileButton.files[i];
-                        const promise = new Promise((fileResolve, fileReject) => {
-                            const reader = new FileReader();
-                            reader.onload = function (event) {
-                                const encryptedContents = encryptFileWithPassword(passwordField.value.trim(), new Uint8Array(event.target.result));
-                                // Replace selected file with its encrypted version
-                                const encryptedFile = new File([encryptedContents], file.name + ".enc", { type: file.type });
-                                fileResolve(encryptedFile);
-                            };
-                            reader.readAsArrayBuffer(file);
-                        });
-                        promises.push(promise);
-                    }
-
-                    Promise.all(promises).then((encryptedFiles) => {
-                        for (const encryptedFile of encryptedFiles) {
-                                container.items.add(encryptedFile);
-                        }
-                        hiddenFileButton.files = container.files;
-                        resolve();
-                    });
-                }
-
-            } else {
-                resolve();
-            }
-        });
-    }
-
-    async function zipFiles() {
-        if (hiddenFileButton.files.length > 1) {
-            const zip = new JSZip();
-            const promises = [];
-            for (let i = 0; i < hiddenFileButton.files.length; i++) {
-                const file = hiddenFileButton.files[i];
-                promises.push(new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        zip.file(file.name, event.target.result);
-                        resolve();
-                    };
-                    reader.readAsArrayBuffer(file);
-                }));
-            }
-            await Promise.all(promises);
-            const blob = await zip.generateAsync({type: "blob"});
-            const zipFile = new File([blob], "archive.zip", {type: "application/zip"});
-            const container = new DataTransfer();
-            container.items.add(zipFile);
-            hiddenFileButton.files = container.files;
-        }
     }
 
     hiddenFileButton.addEventListener('change', function () {

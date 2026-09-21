@@ -70,6 +70,108 @@ impl PastaFile {
     }
 }
 
+/// `read` 权限：读取该上传需要满足的条件。
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReadAccess {
+    /// 任何人只要知道标识符即可读取。
+    Allow,
+    /// 必须提供 read 密码；正文与附件均以该密码加密存储。
+    Password,
+}
+
+/// `write` 权限：修改或删除该上传需要满足的条件。
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum WriteAccess {
+    /// 任何人只要知道标识符即可修改/删除。
+    Allow,
+    /// 必须提供 write 密码。该密码只用于授权判定，不参与内容加密。
+    Password,
+    /// 一律拒绝写入。任何人都无法修改或删除（管理员密码除外）。
+    Refuse,
+}
+
+impl ReadAccess {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReadAccess::Allow => "allow",
+            ReadAccess::Password => "password",
+        }
+    }
+
+    pub fn as_i32(self) -> i32 {
+        match self {
+            ReadAccess::Allow => 0,
+            ReadAccess::Password => 1,
+        }
+    }
+
+    pub fn from_i32(value: i32) -> Self {
+        match value {
+            1 => ReadAccess::Password,
+            _ => ReadAccess::Allow,
+        }
+    }
+
+    /// 从表单值解析；无法识别时取最保守的 `Password`。
+    pub fn from_form(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "allow" | "open" => ReadAccess::Allow,
+            _ => ReadAccess::Password,
+        }
+    }
+}
+
+impl Default for ReadAccess {
+    /// 反序列化旧数据时取最保守的一侧。
+    fn default() -> Self {
+        ReadAccess::Password
+    }
+}
+
+impl WriteAccess {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            WriteAccess::Allow => "allow",
+            WriteAccess::Password => "password",
+            WriteAccess::Refuse => "refuse",
+        }
+    }
+
+    pub fn as_i32(self) -> i32 {
+        match self {
+            WriteAccess::Allow => 0,
+            WriteAccess::Password => 1,
+            WriteAccess::Refuse => 2,
+        }
+    }
+
+    pub fn from_i32(value: i32) -> Self {
+        match value {
+            0 => WriteAccess::Allow,
+            1 => WriteAccess::Password,
+            _ => WriteAccess::Refuse,
+        }
+    }
+
+    /// 从表单值解析；无法识别时取最保守的 `Refuse`。
+    pub fn from_form(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "allow" | "open" => WriteAccess::Allow,
+            "password" => WriteAccess::Password,
+            _ => WriteAccess::Refuse,
+        }
+    }
+}
+
+impl Default for WriteAccess {
+    /// 反序列化旧数据时取最保守的一侧。
+    fn default() -> Self {
+        WriteAccess::Refuse
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Pasta {
     pub id: u64,
@@ -78,12 +180,26 @@ pub struct Pasta {
     #[serde(default)]
     pub attachments: Option<Vec<PastaFile>>,
     pub extension: String,
-    pub private: bool,
-    pub readonly: bool,
+
+    // ---- 权限项（三项相互独立，可单独授予）----
+    /// `read` 权限。
+    #[serde(default)]
+    pub read_access: ReadAccess,
+    /// `write` 权限。
+    #[serde(default)]
+    pub write_access: WriteAccess,
+    /// `list` 权限：是否出现在 `/list` 公开列表中。
+    #[serde(default)]
+    pub listed: bool,
+
+    /// read 密码的校验值：`encrypt(id, read_password)`。
+    #[serde(default)]
+    pub read_key: Option<String>,
+    /// write 密码的校验值：`encrypt(id, write_password)`。
+    #[serde(default)]
+    pub write_key: Option<String>,
+
     pub editable: bool,
-    pub encrypt_server: bool,
-    pub encrypt_client: bool,
-    pub encrypted_key: Option<String>,
     pub created: i64,
     pub expiration: i64,
     pub last_read: i64,
@@ -128,9 +244,42 @@ impl Pasta {
     }
 
     pub fn file_embeddable(&self) -> bool {
+        // 受 read 权限保护时附件是密文，无法直接内嵌预览
         return self.has_file()
             && self.file.as_ref().unwrap().embeddable()
-            && !(self.encrypt_server || self.encrypt_client);
+            && !self.read_requires_password();
+    }
+
+    // ---- 权限判定辅助（供模板与端点复用）----
+
+    /// read 权限是否要求密码。
+    pub fn read_requires_password(&self) -> bool {
+        self.read_access == ReadAccess::Password
+    }
+
+    /// write 权限是否要求密码。
+    pub fn write_requires_password(&self) -> bool {
+        self.write_access == WriteAccess::Password
+    }
+
+    /// write 权限是否一律拒绝。
+    pub fn write_refused(&self) -> bool {
+        self.write_access == WriteAccess::Refuse
+    }
+
+    /// 是否允许写入（不含密码校验）。
+    pub fn write_allowed(&self) -> bool {
+        self.write_access != WriteAccess::Refuse
+    }
+
+    /// 是否允许编辑：服务端总开关开启，且该上传的 write 权限不是 refuse。
+    pub fn can_edit(&self) -> bool {
+        self.editable && self.write_allowed()
+    }
+
+    /// 是否允许删除：write 权限不是 refuse 时，页面上才展示删除入口。
+    pub fn can_remove(&self) -> bool {
+        self.write_allowed()
     }
 
     pub fn created_as_string(&self) -> String {

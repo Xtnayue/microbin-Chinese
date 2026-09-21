@@ -29,7 +29,7 @@
             </thead>
             <tbody>
                 {% for pasta in pastas %}
-                {% if pasta.pasta_type == "text" && !pasta.private %}
+                {% if pasta.pasta_type == "text" && pasta.listed %}
                 <tr>
                     <td>
                         <a
@@ -70,13 +70,13 @@
                     </td>
 
                     <td>
-                        {% if pasta.editable %}
+                        {% if pasta.can_edit() %}
                         <a style="margin-right:1rem"
                             href="{{ args.public_path_as_str() }}/edit/{{pasta.id_as_animals()}}">{{ "Edit"|t }}</a>
                         {%- endif %}
                     </td>
                     <td>
-                        {% if pasta.editable || pasta.readonly || pasta.encrypt_server %}
+                        {% if pasta.can_remove() %}
                         <a href="{{ args.public_path_as_str() }}/remove/{{pasta.id_as_animals()}}">{{ "Remove"|t }}</a>
                         {%- endif %}
                     </td>
@@ -106,7 +106,7 @@
                     </th>
                 </thead>
                 {% for pasta in pastas %}
-                {% if pasta.pasta_type == "url" && !pasta.private %}
+                {% if pasta.pasta_type == "url" && pasta.listed %}
                 <tr>
                     <td>
                         <a
@@ -132,13 +132,13 @@
                             href="{{ args.public_path_as_str() }}/url/{{pasta.id_as_animals()}}">{{ "Redirect"|t }}</a>
                     </td>
                     <td>
-                        {% if pasta.editable %}
+                        {% if pasta.can_edit() %}
                         <a style="margin-right:1rem"
                             href="{{ args.public_path_as_str() }}/edit/{{pasta.id_as_animals()}}">{{ "Edit"|t }}</a>
                         {%- endif %}
                     </td>
                     <td>
-                        {% if pasta.editable || pasta.readonly || pasta.encrypt_server %}
+                        {% if pasta.can_remove() %}
                         <a href="{{ args.public_path_as_str() }}/remove/{{pasta.id_as_animals()}}">{{ "Remove"|t }}</a>
                         {%- endif %}
                     </td>

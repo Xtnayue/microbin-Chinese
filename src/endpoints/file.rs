@@ -75,6 +75,13 @@ pub async fn post_secure_file(
         }
 
         if let Some(filename) = target_filename {
+            // read 权限：先校验密码，避免拿错误密码去做无意义的解密
+            if pastas[index].read_requires_password()
+                && !auth::verify_read_password(&pastas[index], &password)
+            {
+                return Ok(HttpResponse::Unauthorized().finish());
+            }
+
             // Try new naming scheme {filename}.enc first, then fallback to data.enc (legacy/primary)
             let mut enc_path = format!(
                 "{}/attachments/{}/{}.enc",
@@ -175,7 +182,7 @@ pub async fn get_file(
         }
 
         if let Some(pasta_file) = target_file {
-            if pastas[index].encrypt_server {
+            if pastas[index].read_requires_password() {
                 return Ok(HttpResponse::Found()
                     .append_header((
                         "Location",

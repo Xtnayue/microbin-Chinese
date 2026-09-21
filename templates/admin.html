@@ -57,9 +57,9 @@
             <th style="width: 15%;">{{ "Key"|t }}</th>
             <th style="width: 15%;">{{ "Valid"|t }}</th>
             <th style="width: 8%;">{{ "Size"|t }}</th>
-            <th>{{ "Encryption"|t }}</th>
-            <th style="width: 5%;">{{ "Priv."|t }}</th>
-            <th style="width: 5%;">{{ "Edit."|t }}</th>
+            <th>{{ "Read permission"|t }}</th>
+            <th style="width: 8%;">{{ "Write permission"|t }}</th>
+            <th style="width: 5%;">{{ "List permission"|t }}</th>
             <th style="width: 8%;">{{ "Content"|t }}</th>
             <th>{{ "Hits"|t }}</th>
             <th style="width: 8%;">
@@ -83,19 +83,13 @@
                     {{pasta.total_size_as_string()}}
                 </td>
                 <td>
-                    {% if pasta.encrypt_client %}{{ "CLIENT"|t }}{%- endif %}
-                    {% if pasta.encrypt_client && pasta.encrypt_server%}
-                    +
-                    {%- endif %}
-                    {% if pasta.encrypt_server %}{{ "SERVER"|t }}{%- endif %}
+                    {{ pasta.read_access.as_str() }}
                 </td>
                 <td>
-                    {% if pasta.private %}
-                    ✔️
-                    {%- endif %}
+                    {{ pasta.write_access.as_str() }}
                 </td>
                 <td>
-                    {% if pasta.editable %}
+                    {% if pasta.listed %}
                     ✔️
                     {%- endif %}
                 </td>
@@ -118,12 +112,14 @@
                     {%- endif %} {%- endif %}
                 </td>
                 <td>
-                    {% if pasta.editable %}
+                    {% if pasta.can_edit() %}
                     <a style="margin-right:1rem" href="{{ args.public_path_as_str()
                     }}/edit/{{pasta.id_as_animals()}}">{{ "Edit"|t }}</a>
                     <br>
                     {%- endif %}
+                    {% if pasta.can_remove() %}
                     <a href="{{ args.public_path_as_str() }}/remove/{{pasta.id_as_animals()}}">{{ "Remove"|t }}</a>
+                    {%- endif %}
                 </td>
 
             </tr>
@@ -141,9 +137,9 @@
             <thead>
                 <th style="width: 15%;">{{ "Key"|t }}</th>
                 <th style="width: 15%;">{{ "Valid"|t }}</th>
-                <th>{{ "Encryption"|t }}</th>
-                <th style="width: 5%;">{{ "Priv."|t }}</th>
-                <th style="width: 5%;">{{ "Edit."|t }}</th>
+                <th>{{ "Read permission"|t }}</th>
+                <th style="width: 8%;">{{ "Write permission"|t }}</th>
+                <th style="width: 5%;">{{ "List permission"|t }}</th>
                 <th style="width: 8%;">{{ "Content"|t }}</th>
                 <th>{{ "Hits"|t }}</th>
                 <th style="width: 8%;">
@@ -164,19 +160,13 @@
                         {{pasta.expiration_as_string()}}
                     </td>
                     <td>
-                        {% if pasta.encrypt_client %}{{ "CLIENT"|t }}{%- endif %}
-                        {% if pasta.encrypt_client && pasta.encrypt_server%}
-                        +
-                        {%- endif %}
-                        {% if pasta.encrypt_server %}{{ "SERVER"|t }}{%- endif %}
+                        {{ pasta.read_access.as_str() }}
                     </td>
                     <td>
-                        {% if pasta.private %}
-                        ✔️
-                        {%- endif %}
+                        {{ pasta.write_access.as_str() }}
                     </td>
                     <td>
-                        {% if pasta.editable %}
+                        {% if pasta.listed %}
                         ✔️
                         {%- endif %}
                     </td>
@@ -200,12 +190,14 @@
                         {%- endif %} {%- endif %}
                     </td>
                     <td>
-                        {% if pasta.editable %}
+                        {% if pasta.can_edit() %}
                         <a style="margin-right:1rem" href="{{ args.public_path_as_str()
                     }}/edit/{{pasta.id_as_animals()}}">{{ "Edit"|t }}</a>
                         <br>
                         {%- endif %}
+                        {% if pasta.can_remove() %}
                         <a href="{{ args.public_path_as_str() }}/remove/{{pasta.id_as_animals()}}">{{ "Remove"|t }}</a>
+                        {%- endif %}
                     </td>
 
                 </tr>
@@ -274,8 +266,8 @@
                 <tr>
                     <td>bind</td>
                     <td>{{ args.bind }}</td>
-                    <td>private</td>
-                    <td>{{ args.private }}</td>
+                    <td>enable_unlisted</td>
+                    <td>{{ args.enable_unlisted }}</td>
                 </tr>
                 <tr>
                     <td>pure_html</td>
@@ -332,8 +324,8 @@
                     <td>{{ args.eternal_pasta }}</td>
                 </tr>
                 <tr>
-                    <td>enable_readonly</td>
-                    <td>{{ args.enable_readonly }}</td>
+                    <td>enable_read_password</td>
+                    <td>{{ args.enable_read_password }}</td>
                     <td>default_expiry</td>
                     <td>{{ args.default_expiry }}</td>
                 </tr>
@@ -350,12 +342,12 @@
                 <tr>
                     <td>hash_ids</td>
                     <td>{{ args.hash_ids }}</td>
-                    <td>encryption_client_side</td>
-                    <td>{{ args.encryption_client_side }}</td>
+                    <td>enable_write_password</td>
+                    <td>{{ args.enable_write_password }}</td>
                 </tr>
                 <tr>
-                    <td>encryption_server_side</td>
-                    <td>{{ args.encryption_server_side }}</td>
+                    <td>default_permissions</td>
+                    <td>{{ args.default_permissions }}</td>
                     <td>max_file_size_encrypted_mb</td>
                     <td>{{ args.max_file_size_encrypted_mb }} MB</td>
                 </tr>

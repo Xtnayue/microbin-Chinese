@@ -11,10 +11,10 @@
   <a style="margin-right: 1rem" href="{{ args.public_path_as_str()  }}/raw/{{pasta.id_as_animals()}}">{{ "Raw Text Content"|t }}</a>
   {%- endif %} {% if args.qr && args.public_path_as_str() != "" %}
   <a style="margin-right: 1rem" href="{{ args.public_path_as_str()  }}/qr/{{pasta.id_as_animals()}}">{{ "QR"|t }}</a>
-  {%- endif %} {% if pasta.editable && !pasta.encrypt_client %}
+  {%- endif %} {% if pasta.can_edit() %}
   <a style="margin-right: 1rem" href="{{ args.public_path_as_str()  }}/edit/{{pasta.id_as_animals()}}">{{ "Edit"|t }}</a>
   {%- endif %}
-  {% if pasta.editable %}
+  {% if pasta.can_remove() %}
   <a style="margin-right: 1rem" href="{{ args.public_path_as_str()  }}/remove/{{pasta.id_as_animals()}}">{{ "Remove"|t }}</a>
   {%- endif %}
  
@@ -24,9 +24,6 @@
   {% if args.public_path_as_str() != "" %}
   <button id="copy-url-button" class="small-button">{{ "Copy URL"|t }}</button>
   {%- endif %}
-  {% if pasta.encrypt_client && pasta.attachments.is_some() %}
-  <button id="download-all-encrypted-button" class="small-button">{{ "Download all (Decrypted Zip)"|t }}</button>
-  {%- endif %}
   {% if pasta.attachments.is_some() %}
   <select style="margin-left: 1rem" id="view-selector" class="small-button">
     <option value="gallery">{{ "Gallery"|t }}</option>
@@ -34,48 +31,24 @@
     <option value="list">{{ "List"|t }}</option>
   </select>
   {%- endif %}
-  {% if !pasta.encrypt_client && pasta.attachments.is_some() %}
-  <button id="download-all-unencrypted-button" class="small-button" onclick="window.location.href='{{ args.public_path_as_str() }}/archive/{{pasta.id_as_animals()}}'">{{ "Download all as ZIP"|t }}</button>
+  {% if pasta.attachments.is_some() %}
+  {# read 权限要求密码时，附件是密文，先到密码页再打包 #}
+  {% if pasta.read_requires_password() %}
+  <button class="small-button" onclick="window.location.href='{{ args.public_path_as_str() }}/auth_file/{{pasta.id_as_animals()}}?to=archive'">{{ "Download all as ZIP"|t }}</button>
+  {% else %}
+  <button class="small-button" onclick="window.location.href='{{ args.public_path_as_str() }}/archive/{{pasta.id_as_animals()}}'">{{ "Download all as ZIP"|t }}</button>
+  {%- endif %}
   {%- endif %}
   
 </div>
 
 <br>
 <br>
-{% if pasta.encrypt_client %}
-<span style="margin-left: auto; margin-right: auto; display: flex;
-justify-content: center; align-items: center;">
-  <div id="decryption">
-    {% if pasta.encrypt_client %}
-    <label for="password-field" style="margin-bottom: 0.5em;">{{ "Please enter your key to decrypt this upload."|t }}<sup> <a href="{{ args.public_path_as_str() }}/guide#encryption">?</a></sup>
-    </label>
-    <input class="small-button" placeholder="{{ "Key"|t }}" style="margin-right: 0.5rem" type="password" id="password-field"
-      autocomplete="off" />
-    {% if pasta.content != "" %}
-    <button class="small-button" id="decrypt-button" style="margin-right:
-    0.5rem">
-      <b>{{ "Decrypt text"|t }}</b>
-    </button>
-    {%- endif %}
-    {%- endif %}
-    {% if pasta.file.is_some() && !pasta.file_embeddable() %}
-    <button class="small-button" id="download-button" style="margin-right:
-  0.5rem">
-      <b>{{ "Download"|t }} {{pasta.file.as_ref().unwrap().display_name()}}
-        [{{pasta.file.as_ref().unwrap().size}}]
-      </b>
-    </button>
-    {%- endif %}
-  </div>
-</span>
-{%- endif %}
-
-<br>
 
 {% if pasta.content != "" %}
 <div class="code-container">
   <div style="clear: both;">
-    {% if pasta.extension == "auto" || pasta.encrypt_client %}
+    {% if pasta.extension == "auto" %}
     <pre><code id="code">{{pasta.content_escaped()}}</code></pre>
     {% else if args.highlightsyntax %}
     <pre><code id="code">{{pasta.content_syntax_highlighted()}}</code></pre>
@@ -86,7 +59,7 @@ justify-content: center; align-items: center;">
 </div>
 {%- endif %}
 
-{% if pasta.file.is_some() && !pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some() %}
+{% if pasta.file.is_some() && !pasta.file_embeddable() && !pasta.attachments.is_some() %}
 <span style="margin-left: auto; margin-right: auto; display: flex;
     justify-content: center; align-items: center;">
   <p style="font-size: small;">{{pasta.file.as_ref().unwrap().name()}}
@@ -99,7 +72,7 @@ justify-content: center; align-items: center;">
 
 
 {% if pasta.file.is_some() && pasta.file.as_ref().unwrap().is_image() &&
-pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some() %}
+pasta.file_embeddable() && !pasta.attachments.is_some() %}
 <img id="embed" src="{{ args.public_path_as_str()}}/file/{{pasta.id_as_animals()}}" style="max-height: 50vh; max-width: 100%; height: auto; width: auto;" />
 <span style="margin-left: auto; margin-right: auto; display: flex;
   justify-content: center; align-items: center;">
@@ -113,7 +86,7 @@ pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some()
 
 
 {% if pasta.file.is_some() && pasta.file.as_ref().unwrap().is_video() &&
-pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some() %}
+pasta.file_embeddable() && !pasta.attachments.is_some() %}
 <video id="embed" controls src="{{ args.public_path_as_str()}}/file/{{pasta.id_as_animals()}}" height="300"></video>
 <span style="margin-left: auto; margin-right: auto; display: flex;
   justify-content: center; align-items: center;">
@@ -154,11 +127,9 @@ pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some()
                 <td style="padding: 8px;">{{ file.name() }}</td>
                 <td style="padding: 8px;">{{ file.size }}</td>
                 <td style="padding: 8px;">
-                    {% if !pasta.encrypt_client %}
                     <a href="{{ args.public_path_as_str() }}/file/{{pasta.id_as_animals()}}?fname={{ file.url_encoded_name() }}"
                        class="download-link" data-filename="{{ file.name() }}"
-                       {% if !pasta.encrypt_server %}download{% endif %}>{{ "Download"|t }}</a>
-                    {% else %}<em>{{ "Encrypted"|t }}</em>{% endif %}
+                       download>{{ "Download"|t }}</a>
                 </td>
             </tr>
             {% endif %}
@@ -167,11 +138,9 @@ pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some()
                 <td style="padding: 8px;">{{ file.name() }}</td>
                 <td style="padding: 8px;">{{ file.size }}</td>
                 <td style="padding: 8px;">
-                    {% if !pasta.encrypt_client %}
                     <a href="{{ args.public_path_as_str() }}/file/{{pasta.id_as_animals()}}?fname={{ file.url_encoded_name() }}"
                        class="download-link" data-filename="{{ file.name() }}"
-                       {% if !pasta.encrypt_server %}download{% endif %}>{{ "Download"|t }}</a>
-                    {% else %}<em>{{ "Encrypted"|t }}</em>{% endif %}
+                       download>{{ "Download"|t }}</a>
                 </td>
             </tr>
             {% endfor %}
@@ -193,9 +162,6 @@ pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some()
 
 <script type="text/javascript" src="{{ args.public_path_as_str() }}/static/highlight/highlight.min.js"></script>
 <link rel="stylesheet" href="{{ args.public_path_as_str()}}/static/highlight/highlight.min.css">
-{% if pasta.encrypt_client && pasta.attachments.is_some() %}
-<script type="text/javascript" src="{{ args.public_path_as_str() }}/static/jszip.min.js"></script>
-{%- endif %}
 
 <script>
   const copyURLBtn = document.getElementById("copy-url-button")
@@ -208,7 +174,7 @@ pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some()
 
   const te = new TextEncoder();
 
-  // {% if pasta.extension == "auto" && !pasta.encrypt_client %}
+  // {% if pasta.extension == "auto" %}
   onload = (event) => {
     contentElement.innerHTML = content;
     hljs.highlightAll();
@@ -304,100 +270,6 @@ pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some()
     })
   }
 
-  // {% if pasta.encrypt_client %}
-
-  const decryptDiv = document.getElementById('decryption');
-  const decryptButton = document.getElementById('decrypt-button');
-  const passwordField = document.getElementById("password-field");
-  const downloadButton = document.getElementById('download-button');
-
-  // {% if pasta.file.is_some() %}
-  // Set up event listener for download link click
-  downloadButton.addEventListener('click', async (event) => {
-    event.preventDefault(); // prevent default click behavior
-
-    if (passwordField.value.trim() == "") {
-      passwordField.focus();
-      return false;
-    }
-
-    // Fetch encrypted file from server
-    const formData = new FormData();
-
-    // {% if pasta.encrypted_key.is_some() %}
-    let key = decryptWithPassword(passwordField.value.trim(), "{{ pasta.encrypted_key.as_ref().unwrap() }}");
-    // {%- endif %}
-    formData.append('password', key);
-
-    const response = await fetch('{{ args.public_path_as_str() }}/secure_file/{{ pasta.id_as_animals() }}', {
-      method: 'POST',
-      body: formData,
-    })
-
-    // {% if pasta.file.is_some() %}
-    const encryptedFile = await response.text();
-
-    // Decrypt file contents
-    const decryptedContents = decryptFileWithPassword(passwordField.value.trim(), encryptedFile);
-    if (!decryptedContents) {
-      throw new Error('Failed to decrypt file');
-    }
-
-    // Create blob from decrypted file contents
-    const decryptedBlob = new Blob([decryptedContents], { type: 'application/octet-stream' });
-
-    // Create data URI for decrypted file
-    // const dataUri = `data:application/octet-stream;${encodeURIComponent(decryptedContents)}`;
-
-    // Create temporary anchor element
-    const tempAnchorEl = document.createElement('a');
-    // tempAnchorEl.href = dataUri;
-    tempAnchorEl.href = URL.createObjectURL(decryptedBlob);
-    tempAnchorEl.download = '{{pasta.file.as_ref().unwrap().display_name()}}';
-
-    // Programmatically click anchor element to trigger download
-    tempAnchorEl.click();
-
-    // {%- endif %}
-  });
-  // {% endif  %}
-
-  decryptButton.addEventListener("click", () => {
-    password = passwordField.value;
-
-    content = contentDecrypted = escapeHtml(decryptWithPassword(password, content));
-    if (contentDecrypted) {
-      contentElement.innerHTML = contentDecrypted;
-      // {% if pasta.extension == "auto" %}
-      hljs.highlightAll();
-      // {% endif  %}
-      contentElement.innerHTML = wrapStringInCodeLines(contentElement.innerHTML);
-      // decryptDiv.style.display = 'none';
-    }
-  });
-
-  function decryptWithPassword(password, encryptedHex) {
-    const passwordBytes = aesjs.utils.utf8.toBytes(password.padStart(32, "#"));
-    const encryptedBytes = aesjs.utils.hex.toBytes(encryptedHex);
-    const aesCtr = new aesjs.ModeOfOperation.ctr(passwordBytes);
-    const decryptedBytes = aesCtr.decrypt(encryptedBytes);
-    const res = aesjs.utils.utf8.fromBytes(decryptedBytes);
-
-    if (res.endsWith("!0K")) {
-      return res.substring(0, res.length - "!0K".length);
-    } else {
-      return null;
-    }
-  }
-
-  function decryptFileWithPassword(password, encryptedHex) {
-    const passwordBytes = aesjs.utils.utf8.toBytes(password.padStart(32, "#"));
-    const encryptedBytes = aesjs.utils.hex.toBytes(encryptedHex);
-    const aesCtr = new aesjs.ModeOfOperation.ctr(passwordBytes);
-    const decryptedBytes = aesCtr.decrypt(encryptedBytes);
-    return decryptedBytes;
-  }
-// {% endif %}
 
 // {% if pasta.attachments.is_some() %}
   const galleryView = document.getElementById('gallery-view');
@@ -435,47 +307,6 @@ pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some()
   applyViewChange(currentView || 'gallery');
 // {% endif %}
 
-// {% if pasta.encrypt_client && pasta.attachments.is_some() %}
-  const downloadAllEncryptedBtn = document.getElementById('download-all-encrypted-button');
-  if (downloadAllEncryptedBtn) {
-    downloadAllEncryptedBtn.addEventListener('click', async (event) => {
-      event.preventDefault();
-      if (passwordField.value.trim() == "") { passwordField.focus(); return false; }
-      downloadAllEncryptedBtn.textContent = "{{ "Processing..."|t }}";
-      downloadAllEncryptedBtn.disabled = true;
-      try {
-        const zip = new JSZip();
-        const links = Array.from(document.querySelectorAll('.download-link'));
-        const uniqueLinks = new Map();
-        links.forEach(link => {
-          const filename = link.getAttribute('data-filename');
-          if (!uniqueLinks.has(filename)) uniqueLinks.set(filename, link.href);
-        });
-        const promises = [];
-        for (const [filename, url] of uniqueLinks) {
-          promises.push(fetch(url)
-            .then(r => r.arrayBuffer())
-            .then(buf => {
-              const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-              const dec = decryptFileWithPassword(passwordField.value.trim(), hex);
-              if (dec) zip.file(filename, dec);
-            }));
-        }
-        await Promise.all(promises);
-        const content = await zip.generateAsync({type:"blob"});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(content);
-        a.download = "{{pasta.id_as_animals()}}.zip";
-        a.click();
-      } catch (e) {
-        alert("{{ "Failed to generate zip. See console."|t }}");
-        console.error(e);
-      }
-      downloadAllEncryptedBtn.textContent = "{{ "Download all (Decrypted Zip)"|t }}";
-      downloadAllEncryptedBtn.disabled = false;
-    });
-  }
-// {% endif %}
 </script>
 
 <style>
@@ -594,16 +425,5 @@ pasta.file_embeddable() && !pasta.encrypt_client && !pasta.attachments.is_some()
     max-height: 80vh;
   }
 </style>
-
-{% if !args.pure_html %}
-<style>
-  #decryption {
-    background-color: #b0b9cc0d;
-    border-radius: 6px;
-    padding: 10px;
-    width: fit-content;
-  }
-</style>
-{% endif %}
 
 {% include "footer.html" %}

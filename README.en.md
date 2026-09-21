@@ -36,7 +36,7 @@ On our website [microbin.eu](https://microbin.eu), you will find the following:
 ## Features
 
 - Entirely self-contained executable, MicroBin is a single file!
-- Server-side and client-side E2E encryption
+- Server-side encryption: with `read` set to password, the text content and all attachments are stored encrypted with that password
 - File uploads (e.g. `server.com/file/pig-dog-cat`)
 - Raw text serving (e.g. `server.com/raw/pig-dog-cat`)
 - QR code support
@@ -44,7 +44,7 @@ On our website [microbin.eu](https://microbin.eu), you will find the following:
 - Animal names instead of random numbers for upload identifiers (64 animals)
 - Multiple attachments
 - SQLite and JSON database support
-- Private and public, editable and uneditable, automatically and never expiring uploads
+- Three independent permissions (`read` / `write` / `list`) that can be combined freely
 - Automatic dark mode and custom styling support with very little CSS and only vanilla JS (see [`water.css`](https://github.com/kognise/water.css))
 - And much more!
 

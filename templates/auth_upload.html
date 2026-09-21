@@ -1,66 +1,18 @@
 {% include "header.html" %}
 
-{% if encrypt_client %}
-
-<form id="auth-form" method="POST" action="{{ args.public_path_as_str() }}/{{path}}/{{id}}" enctype="multipart/form-data">
+<form id="auth-form" method="POST" action="{{ args.public_path_as_str() }}/{{path}}/{{id}}{{query}}" enctype="multipart/form-data">
   {% if status == "success" %}
   <b>{{ "Success!"|t }}</b> <br>
   {% endif %}
-  <label for="password">{{ "Please enter the password to access or modify this upload."|t }}<sup>
-      <a href="{{ args.public_path_as_str() }}/guide#encryption">?</a></sup></label>
-  <input id="password-field" required placeholder="{{ "Password"|t }}" type="password" autocomplete="off">
-  <input id="password-hidden" name="password" type="hidden">
-  <button>{{ "Okay"|t }}</button>
 
-  {% if status == "incorrect" %}
-  <b>{{ "Incorrect password."|t }}</b>
+  {% if permission == "write" %}
+  <label for="password" style="margin-bottom: 0.5rem;">{{ "Please enter the write password to modify or remove this upload."|t }}<sup>
+      <a href="{{ args.public_path_as_str() }}/guide#write">?</a></sup></label>
+  {% else %}
+  <label for="password" style="margin-bottom: 0.5rem;">{{ "Please enter the read password to access this upload."|t }}<sup>
+      <a href="{{ args.public_path_as_str() }}/guide#read">?</a></sup></label>
   {% endif %}
-</form>
 
-<script>
-
-  const form = document.getElementById("auth-form");
-  const passwordField = document.getElementById("password-field");
-  const passwordHiddenField = document.getElementById("password-hidden");
-
-  form.onsubmit = function () {
-
-    if (passwordField.value.trim() == "") {
-      passwordField.focus();
-      return false;
-    }
-
-    let key = decryptWithPassword(passwordField.value, "{{ encrypted_key }}");
-
-    if (key) {
-      passwordHiddenField.value = key;
-    }
-
-  };
-
-  function decryptWithPassword(password, encryptedHex) {
-    const passwordBytes = aesjs.utils.utf8.toBytes(password.padStart(32, "#"));
-    const encryptedBytes = aesjs.utils.hex.toBytes(encryptedHex);
-    const aesCtr = new aesjs.ModeOfOperation.ctr(passwordBytes);
-    const decryptedBytes = aesCtr.decrypt(encryptedBytes);
-    const res = aesjs.utils.utf8.fromBytes(decryptedBytes);
-
-    if (res.endsWith("!0K")) {
-      return res.substring(0, res.length - "!0K".length);
-    } else {
-      return null;
-    }
-  }
-</script>
-
-{% else %}
-
-<form id="auth-form" method="POST" action="{{ args.public_path_as_str() }}/{{path}}/{{id}}" enctype="multipart/form-data">
-  {% if status == "success" %}
-  <b>{{ "Success!"|t }}</b> <br>
-  {% endif %}
-  <label for="password" style="margin-bottom: 0.5rem;">{{ "Please enter the password to access or modify this upload."|t }}<sup>
-      <a href="{{ args.public_path_as_str() }}/guide#encryption">?</a></sup></label>
   <input id="password-field" placeholder="{{ "Password"|t }}" name="password" type="password" autocomplete="off" />
   <button>{{ "Okay"|t }}</button>
 
@@ -68,31 +20,6 @@
   <b>{{ "Incorrect password."|t }}</b>
   {% endif %}
 </form>
-
-
-<script>
-
-  const form = document.getElementById("auth-form");
-  const passwordField = document.getElementById("password-field");
-
-  form.onsubmit = function () {
-
-    if (passwordField.value.trim() == "") {
-      passwordField.focus();
-      return false;
-    }
-
-    let key = decryptWithPassword(passwordField.value, "{{ encrypted_key }}");
-
-    if (key) {
-      passwordHiddenField.value = key;
-    }
-
-  };
-
-</script>
-
-{% endif %}
 
 {% include "footer.html" %} {% if !args.pure_html %}
 <style>

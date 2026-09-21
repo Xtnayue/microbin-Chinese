@@ -1,3 +1,4 @@
+use serde_json::json;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufWriter};
@@ -30,16 +31,105 @@ fn save_to_file(pasta_data: &Vec<Pasta>) {
     std::fs::rename(tmp_file_path, DATABASE_PATH).expect("Could not update database");
 }
 
+/// 把旧的「隐私分档」记录就地映射到新的权限列。
+///
+/// 旧 JSON 记录里没有 `read_access` / `write_access` / `listed` 三个字段，
+/// 若直接按 `#[serde(default)]` 反序列化，会全部落到最保守的一侧
+/// （read=password、write=refuse、不列出），使旧数据凭空变得不可读也不可写。
+/// 因此这里在反序列化前按旧字段把三项权限补齐。
+///
+/// 映射规则与 SQLite 的迁移完全一致（旧代码里「写入需要密码」的判定是
+/// `readonly || encrypt_server`，不是单看 `readonly`）：
+///
+/// ```text
+/// listed       = !private
+/// read_access  = encrypt_server               ? "password" : "allow"
+/// write_access = readonly || encrypt_server   ? "password" : "allow"
+/// read_key / write_key = encrypted_key
+/// ```
+///
+/// 旧的 `encrypted_key` 就是 `encrypt(上传 id, 密码)`，与新的校验值格式相同，
+/// 因此两个 key 都可以直接沿用。返回 `true` 表示该条记录被迁移过。
+fn migrate_legacy_permissions(value: &mut serde_json::Value) -> bool {
+    let Some(object) = value.as_object_mut() else {
+        return false;
+    };
+
+    // 已经有新字段，说明是迁移过的记录或新建的记录
+    if object.contains_key("read_access") {
+        return false;
+    }
+
+    let flag = |key: &str| {
+        object
+            .get(key)
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false)
+    };
+
+    let private = flag("private");
+    let readonly = flag("readonly");
+    let encrypt_server = flag("encrypt_server");
+
+    let encrypted_key = object
+        .get("encrypted_key")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+
+    object.insert(
+        String::from("read_access"),
+        json!(if encrypt_server { "password" } else { "allow" }),
+    );
+    object.insert(
+        String::from("write_access"),
+        json!(if readonly || encrypt_server {
+            "password"
+        } else {
+            "allow"
+        }),
+    );
+    object.insert(String::from("listed"), json!(!private));
+    object.insert(String::from("read_key"), encrypted_key.clone());
+    object.insert(String::from("write_key"), encrypted_key);
+
+    true
+}
+
 fn load_from_file() -> io::Result<Vec<Pasta>> {
     let file = File::open(DATABASE_PATH);
     match file {
         Ok(_) => {
             let reader = BufReader::new(file.unwrap());
-            let data: Vec<Pasta> = match serde_json::from_reader(reader) {
-                Ok(t) => t,
+
+            // 先按通用 JSON 读出来，才能识别并迁移旧的权限字段
+            let mut values: Vec<serde_json::Value> = match serde_json::from_reader(reader) {
+                Ok(values) => values,
                 _ => Vec::new(),
             };
-            Ok(data)
+
+            let mut migrated = 0usize;
+            for value in values.iter_mut() {
+                if migrate_legacy_permissions(value) {
+                    migrated += 1;
+                }
+            }
+
+            if migrated > 0 {
+                log::warn!(
+                    "已将 {migrated} 条旧的隐私分档记录迁移到新的权限模型（read / write / list）。\
+                     旧的浏览器端加密上传无法再在浏览器里解密，其正文将保持密文。"
+                );
+            }
+
+            let mut pastas = Vec::with_capacity(values.len());
+            for value in values {
+                match serde_json::from_value::<Pasta>(value) {
+                    Ok(pasta) => pastas.push(pasta),
+                    Err(error) => log::error!("Skipped an unreadable record in the JSON database: {error}"),
+                }
+            }
+
+            Ok(pastas)
         }
         Err(_) => {
             log::info!("Database file {} not found!", DATABASE_PATH);

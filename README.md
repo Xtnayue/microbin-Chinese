@@ -53,13 +53,52 @@ microbin
 
 ### 本地构建（Windows）
 
-若本机**没有安装 MSVC 生成工具**（缺少 `link.exe` 与 Windows SDK），默认的 `x86_64-pc-windows-msvc` 工具链无法链接。此时可改用 MinGW 工具链：
+默认 feature 会**从源码编译 OpenSSL**（`openssl` 的 `vendored`）、**SQLite**（`rusqlite` 的 `bundled`）、**oniguruma** 与 **zstd**，所以需要一个可用的 C 工具链。
+
+#### 推荐：MSVC 工具链（完整功能）
+
+需要三样东西：
+
+1. **Visual Studio 生成工具**（勾选「使用 C++ 的桌面开发」，提供 `cl.exe` / `link.exe`）与 **Windows SDK**
+2. **Strawberry Perl** —— OpenSSL 的 `Configure` 依赖完整的 Perl。**Git for Windows 自带的 perl 是被裁剪过的，会报 `Can't locate Locale/Maketext/Simple.pm`，不能用。**
+3. **NASM** —— OpenSSL 在 Windows 上启用汇编优化时需要
 
 ```bash
-# 1. 安装 MinGW-w64（任选其一）
+winget install Microsoft.VisualStudio.2022.BuildTools
+winget install StrawberryPerl.StrawberryPerl
+winget install NASM.NASM
+```
+
+装好后**不需要手动执行 `vcvars64.bat`**：`rustc` 通过注册表定位 MSVC 链接器，`cc` 通过 vswhere 定位 `cl.exe` 并自动注入 `INCLUDE` / `LIB`。
+
+把 Strawberry Perl 放在 `PATH` **最前面**（压过 Git 自带的 perl），Git 的 `usr/bin` 放**最后**（它里面的 `link.exe` 是个文件工具，会遮蔽 MSVC 的链接器）：
+
+```bash
+export PATH="/c/Strawberry/perl/bin:/c/Program Files/NASM:$PATH:/c/Program Files/Git/usr/bin"
+cargo build --release
+```
+
+产物为 `target/release/microbin.exe`：
+
+```bash
+./target/release/microbin.exe --language zh
+```
+
+数据库默认走 SQLite，位于 `microbin_data/database.sqlite`。
+
+> 首次构建要从源码编译 OpenSSL，约 **25–30 分钟**；之后的增量构建约 2 分钟。
+
+#### 备选：没有 MSVC 时改用 MinGW
+
+若本机没有 MSVC 生成工具（缺少 `link.exe` 与 Windows SDK），默认的 `x86_64-pc-windows-msvc` 工具链无法链接。此时可改用 MinGW 工具链：
+
+```bash
+# 1. 安装 MinGW-w64
 winget install BrechtSanders.WinLibs.POSIX.UCRT
 
 # 2. 安装 gnu 宿主工具链
+#    注意：只加 --target 是不够的——Cargo 的构建脚本与 proc-macro 永远按
+#    宿主平台编译，必须换成 gnu 宿主的工具链
 rustup toolchain install stable-x86_64-pc-windows-gnu
 
 # 3. 构建（--no-default-features 可避开 openssl/oniguruma 的 C 依赖）
@@ -69,10 +108,10 @@ cargo +stable-x86_64-pc-windows-gnu build --release \
     --no-default-features --features no-c-deps
 ```
 
-> 注意：`--no-default-features` 会关闭 SQLite 支持，运行时必须加 `--json-db` 参数，例如：
+> ⚠️ `--no-default-features` 会**关闭 SQLite 支持**，运行时必须加 `--json-db` 改用 JSON 后端：
 > `./target/release/microbin.exe --json-db --language zh`
-
-若本机已安装 MSVC 生成工具，直接 `cargo build --release` 即可，无需上述参数。
+>
+> 另外 JSON 后端的库路径固定为 `pasta_data/database.json`，**不随 `--data-dir` 变化**，启动前需保证该目录存在（`mkdir -p pasta_data`），否则启动即 panic。
 
 ## 自行部署 MicroBin
 

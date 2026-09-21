@@ -77,6 +77,8 @@ CLI flags changed accordingly:
 - Added: `--enable-unlisted`, `--enable-read-password`, `--enable-write-password`
 - Added: `--default-permissions=read=allow,write=allow,list=yes` (comma-separated `key=value`)
 
+> Like their upstream counterparts, the three `--enable-*` flags **only control the options offered on the new-upload form; they are not a server-side policy**. Posting a disabled value straight to `/upload` is still accepted. This matches upstream: `--encryption-client-side`, `--encryption-server-side` and `--private` were template-only as well, and the single server-side guard (`--enable-readonly`) was a **silent downgrade** (posting `readonly` produced a writable upload) rather than a rejection. This fork keeps the same "UI switch" role and just states it plainly in the help text, so the flags are not mistaken for enforcement.
+
 **Upgrading is automatic.** Existing data is migrated on read by both backends, and the migration is idempotent (restarting does not migrate twice or alter already-migrated data):
 
 - **SQLite** (default backend): `ALTER TABLE ... ADD COLUMN` plus a mapping pass at startup;

@@ -80,6 +80,8 @@ read 密码与 write 密码职责分离：read 密码额外用于加解密正文
 - 新增 `--enable-unlisted`、`--enable-read-password`、`--enable-write-password`
 - 新增 `--default-permissions=read=allow,write=allow,list=yes`（逗号分隔的 `键=值`，键为 `read` / `write` / `list`）
 
+> 三个 `--enable-*` 与上游的同类开关一样，**只控制新建上传界面上的选项，不是服务端策略**：直接向 `/upload` 提交一个被禁用的取值仍然会被接受。这与上游行为一致 —— 上游的 `--encryption-client-side` / `--encryption-server-side` / `--private` 同样只作用于模板，仅 `--enable-readonly` 带一个服务端守卫，而且那是**静默降级**（提交 `readonly` 会被当成可写）而非拒绝。本分支沿用了「界面开关」这一定位，并把帮助文案写清楚，以免被误当成策略校验。
+
 **旧数据无需手工处理**，两个后端都会在读取时自动迁移，且**幂等**（重复启动不会二次迁移，也不会改动已迁移的数据）：
 
 - **SQLite**（默认后端）：启动时用 `ALTER TABLE ... ADD COLUMN` 补齐新列，再按旧档位映射；

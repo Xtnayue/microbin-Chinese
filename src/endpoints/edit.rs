@@ -9,6 +9,7 @@ use actix_multipart::Multipart;
 use actix_web::error::ErrorBadRequest;
 use actix_web::{get, post, web, Error, HttpResponse};
 use askama::Template;
+use crate::i18n::filters;
 use bytes::BytesMut;
 use futures::TryStreamExt;
 
@@ -231,7 +232,7 @@ pub async fn post_submit_edit_private(
             }
             if !buf.is_empty() {
                 new_content = String::from_utf8(buf.to_vec())
-                    .map_err(|_| ErrorBadRequest("Invalid UTF-8 in content"))?;
+                    .map_err(|_| ErrorBadRequest(crate::i18n::tr("Invalid UTF-8 in content")))?;
             }
         }
         if field.name() == Some("password") {
@@ -330,7 +331,7 @@ pub async fn post_edit(
             }
             if !buf.is_empty() {
                 new_content = String::from_utf8(buf.to_vec())
-                    .map_err(|_| ErrorBadRequest("Invalid UTF-8 in content"))?;
+                    .map_err(|_| ErrorBadRequest(crate::i18n::tr("Invalid UTF-8 in content")))?;
             }
         }
         if field.name() == Some("password") {

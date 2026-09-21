@@ -10,6 +10,7 @@ use actix_web::error::ErrorBadRequest;
 use actix_web::cookie::Cookie;
 use actix_web::{get, web, Error, HttpResponse, Responder};
 use askama::Template;
+use crate::i18n::filters;
 use bytes::BytesMut;
 use bytesize::ByteSize;
 use futures::TryStreamExt;
@@ -205,7 +206,7 @@ pub async fn create(
                 }
 
                 if !is_valid_expiration(&expiration_str, &ARGS.max_expiry) {
-                    return Err(ErrorBadRequest("Expiration exceeds maximum allowed"));
+                    return Err(ErrorBadRequest(crate::i18n::tr("Expiration exceeds maximum allowed")));
                 }
 
                 new_pasta.expiration = expiration_to_timestamp(&expiration_str, timenow);
@@ -236,7 +237,7 @@ pub async fn create(
                 }
                 if !buf.is_empty() {
                     new_pasta.content = String::from_utf8(buf.to_vec())
-                        .map_err(|_| ErrorBadRequest("Invalid UTF-8 in content"))?;
+                        .map_err(|_| ErrorBadRequest(crate::i18n::tr("Invalid UTF-8 in content")))?;
                     new_pasta.pasta_type = if is_valid_url(new_pasta.content.as_str()) {
                         String::from("url")
                     } else {
@@ -279,7 +280,7 @@ pub async fn create(
                 )) {
                     log::error!("Failed to create directory: {}", e);
                     return Err(actix_web::error::ErrorInternalServerError(
-                        "Failed to create attachment directory",
+                        crate::i18n::tr("Failed to create attachment directory"),
                     ));
                 }
 
@@ -298,7 +299,7 @@ pub async fn create(
                         && size > ARGS.max_file_size_encrypted_mb * 1024 * 1024)
                         || size > ARGS.max_file_size_unencrypted_mb * 1024 * 1024
                     {
-                        return Err(ErrorBadRequest("File exceeded size limit."));
+                        return Err(ErrorBadRequest(crate::i18n::tr("File exceeded size limit.")));
                     }
                     f = web::block(move || f.write_all(&chunk).map(|_| f)).await??;
                 }

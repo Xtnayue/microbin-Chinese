@@ -45,14 +45,14 @@ padding-right:0.5rem; line-height: 1.5; font-size: 1.1em; padding-top: 2rem;">
             </b>
 
             <a href="{{ args.public_path_as_str() }}/" style="margin-right: 0.5rem;
-            margin-left: 0.5rem">New</a>
+            margin-left: 0.5rem">{{ "New"|t }}</a>
 
             {% if !args.no_listing %}
-            <a href="{{ args.public_path_as_str() }}/list" style="margin-right: 0.5rem; margin-left: 0.5rem">List</a>
+            <a href="{{ args.public_path_as_str() }}/list" style="margin-right: 0.5rem; margin-left: 0.5rem">{{ "List"|t }}</a>
             {%- endif %}
 
             <a href="{{ args.public_path_as_str() }}/guide" style="margin-right: 0.5rem;
-            margin-left: 0.5rem">Guide</a>
+            margin-left: 0.5rem">{{ "Guide"|t }}</a>
 
 
         </div>

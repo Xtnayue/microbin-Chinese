@@ -10,6 +10,7 @@ use crate::AppState;
 use actix_multipart::Multipart;
 use actix_web::{get, post, web, Error, HttpRequest, HttpResponse};
 use askama::Template;
+use crate::i18n::filters;
 use magic_crypt::{new_magic_crypt, MagicCryptTrait};
 
 use std::time::{SystemTime, UNIX_EPOCH};

@@ -6,6 +6,7 @@ use crate::AppState;
 use actix_multipart::Multipart;
 use actix_web::{get, post, web, Error, HttpResponse};
 use askama::Template;
+use crate::i18n::filters;
 use futures::TryStreamExt;
 
 #[derive(Template)]

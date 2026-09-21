@@ -4,21 +4,16 @@
 
 <form id="auth-form" method="POST" action="{{ args.public_path_as_str() }}/{{path}}/{{id}}" enctype="multipart/form-data">
   {% if status == "success" %}
-  <b>
-    Success!
-  </b> <br>
+  <b>{{ "Success!"|t }}</b> <br>
   {% endif %}
-  <label for="password"> Please enter the
-    password to access or modify this upload. <sup>
+  <label for="password">{{ "Please enter the password to access or modify this upload."|t }}<sup>
       <a href="{{ args.public_path_as_str() }}/guide#encryption">?</a></sup></label>
-  <input id="password-field" required placeholder="Password" type="password" autocomplete="off">
+  <input id="password-field" required placeholder="{{ "Password"|t }}" type="password" autocomplete="off">
   <input id="password-hidden" name="password" type="hidden">
-  <button>Okay</button>
+  <button>{{ "Okay"|t }}</button>
 
   {% if status == "incorrect" %}
-  <b>
-    Incorrect password.
-  </b>
+  <b>{{ "Incorrect password."|t }}</b>
   {% endif %}
 </form>
 
@@ -62,20 +57,15 @@
 
 <form id="auth-form" method="POST" action="{{ args.public_path_as_str() }}/{{path}}/{{id}}" enctype="multipart/form-data">
   {% if status == "success" %}
-  <b>
-    Success!
-  </b> <br>
+  <b>{{ "Success!"|t }}</b> <br>
   {% endif %}
-  <label for="password" style="margin-bottom: 0.5rem;"> Please enter the
-    password to access or modify this upload. <sup>
+  <label for="password" style="margin-bottom: 0.5rem;">{{ "Please enter the password to access or modify this upload."|t }}<sup>
       <a href="{{ args.public_path_as_str() }}/guide#encryption">?</a></sup></label>
-  <input id="password-field" placeholder="Password" name="password" type="password" autocomplete="off" />
-  <button>Okay</button>
+  <input id="password-field" placeholder="{{ "Password"|t }}" name="password" type="password" autocomplete="off" />
+  <button>{{ "Okay"|t }}</button>
 
   {% if status == "incorrect" %}
-  <b>
-    Incorrect password.
-  </b>
+  <b>{{ "Incorrect password."|t }}</b>
   {% endif %}
 </form>
 

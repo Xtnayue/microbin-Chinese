@@ -19,6 +19,7 @@ use std::io::Write;
 use std::sync::Mutex;
 
 pub mod args;
+pub mod i18n;
 pub mod pasta;
 
 pub mod util {

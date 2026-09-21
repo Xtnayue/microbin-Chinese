@@ -1,5 +1,6 @@
 use actix_web::{get, web, HttpResponse};
 use askama::Template;
+use crate::i18n::filters;
 
 use crate::args::{Args, ARGS};
 use crate::pasta::Pasta;

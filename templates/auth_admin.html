@@ -1,15 +1,13 @@
 {% include "header.html" %}
 
 <form id="auth-form" method="POST" action="{{ args.public_path_as_str() }}/admin/" enctype="multipart/form-data">
-  <label for="username"> Administrator username</label>
-  <input id="username-field" placeholder="Username" type="username" autocomplete="off" name="username">
-  <label for="password"> Administrator password.</label>
-  <input id="password-field" placeholder="Password" type="password" autocomplete="off" name="password">
-  <button>Sign in</button>
+  <label for="username">{{ "Administrator username"|t }}</label>
+  <input id="username-field" placeholder="{{ "Username"|t }}" type="username" autocomplete="off" name="username">
+  <label for="password">{{ "Administrator password."|t }}</label>
+  <input id="password-field" placeholder="{{ "Password"|t }}" type="password" autocomplete="off" name="password">
+  <button>{{ "Sign in"|t }}</button>
   {% if status == "incorrect" %}
-  <p>
-    Incorrect username or password.
-  </p>
+  <p>{{ "Incorrect username or password."|t }}</p>
   {% endif %}
 </form>
 

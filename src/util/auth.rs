@@ -21,7 +21,7 @@ pub async fn auth_validator(
         {
             Ok(req)
         }
-        _ => Err((error::ErrorBadRequest("Invalid login details."), req)),
+        _ => Err((error::ErrorBadRequest(crate::i18n::tr("Invalid login details.")), req)),
     }
 }
 

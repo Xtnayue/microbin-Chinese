@@ -1,9 +1,9 @@
 {% include "header.html" %}
 <form action="{{ args.public_path_as_str() }}/{{ path }}/{{ pasta.id_as_animals() }}" method="POST" enctype="multipart/form-data">
     <h4>
-        Editing upload '{{ pasta.id_as_animals() }}'
+        {{ "Editing upload"|t }} '{{ pasta.id_as_animals() }}'
     </h4>
-    <label>Content</label>
+    <label>{{ "Content"|t }}</label>
     <br>
     <textarea style="width: 100%; min-height: 100px; font-family: monospace;" name="content" id="content" {% if status
         !="incorrect" %} autofocus {% endif %}>{{ pasta.content_textarea_safe() }}</textarea>
@@ -11,13 +11,11 @@
     <div>
         {% if pasta.readonly || pasta.encrypt_server %}
         <div style="float: left; height: 90px;">
-            <label for="password">Re-enter Password <sup><a href="{{ args.public_path_as_str() }}/guide#password">?</a></sup></label><br>
+            <label for="password">{{ "Re-enter Password"|t }}<sup><a href="{{ args.public_path_as_str() }}/guide#password">?</a></sup></label><br>
             <input {% if status=="incorrect" %} autofocus {% endif %} style="width: 130px; height: 28px;"
                 type="password" id="password" name="password" autocomplete="off" />
             {% if status == "incorrect" %}
-            <p>
-                Incorrect password.
-            </p>
+            <p>{{ "Incorrect password."|t }}</p>
             {% endif %}
         </div>
         {% endif %}
@@ -25,7 +23,7 @@
 
         <div style="float: right; height: 90px; justify-content: end;">
             <label for="password_field"></label><br>
-            <input id="submit-button" type="submit" value="Save" />
+            <input id="submit-button" type="submit" value="{{ "Save"|t }}" />
             </td>
         </div>
     </div>

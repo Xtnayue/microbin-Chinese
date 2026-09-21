@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches, Parser};
 use lazy_static::lazy_static;
 use serde::Serialize;
 use std::convert::Infallible;
@@ -8,7 +8,22 @@ use std::str::FromStr;
 use crate::fs;
 
 lazy_static! {
-    pub static ref ARGS: Args = Args::parse();
+    pub static ref ARGS: Args = Args::parse_localized();
+}
+
+impl Args {
+    /// 解析命令行参数。
+    ///
+    /// 与 `Args::parse()` 的区别：先用 [`crate::i18n::localize_command`] 按语言
+    /// 本地化 `--help` 文案，再交给 clap 解析。
+    pub fn parse_localized() -> Args {
+        let cmd = crate::i18n::localize_command(
+            <Args as CommandFactory>::command::<'static>(),
+        );
+        let matches = cmd.get_matches();
+        <Args as FromArgMatches>::from_arg_matches(&matches)
+            .expect("failed to parse command line arguments")
+    }
 }
 
 #[derive(Parser, Debug, Clone, Serialize)]
@@ -158,6 +173,10 @@ pub struct Args {
 
     #[clap(long, env = "MICROBIN_DEFAULT_VIEW", default_value = "gallery")]
     pub default_view: String,
+
+    /// 界面语言：en（英文）或 zh（中文）。默认 en。
+    #[clap(long, env = "MICROBIN_LANGUAGE", default_value = "en")]
+    pub language: String,
 }
 
 impl Args {
@@ -247,6 +266,7 @@ impl Args {
             disable_update_checking: self.disable_update_checking,
 
             default_view: self.default_view,
+            language: self.language,
         }
     }
 }

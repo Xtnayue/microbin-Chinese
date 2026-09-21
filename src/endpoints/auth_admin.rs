@@ -1,6 +1,7 @@
 use crate::args::{Args, ARGS};
 use actix_web::{get, web, HttpResponse};
 use askama::Template;
+use crate::i18n::filters;
 
 #[derive(Template)]
 #[template(path = "auth_admin.html")]

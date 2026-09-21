@@ -1,6 +1,7 @@
 use crate::args::{Args, ARGS};
 use actix_web::{get, HttpResponse};
 use askama::Template;
+use crate::i18n::filters;
 
 #[derive(Template)]
 #[template(path = "guide.html")]

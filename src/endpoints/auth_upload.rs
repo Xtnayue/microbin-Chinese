@@ -6,6 +6,7 @@ use crate::util::misc::remove_expired;
 use crate::AppState;
 use actix_web::{get, web, HttpResponse};
 use askama::Template;
+use crate::i18n::filters;
 
 #[derive(Template)]
 #[template(path = "auth_upload.html")]

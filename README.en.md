@@ -82,6 +82,8 @@ CLI flags changed accordingly:
 - **SQLite** (default backend): `ALTER TABLE ... ADD COLUMN` plus a mapping pass at startup;
 - **JSON** (`--json-db`): each record is recognized and completed before deserialization.
 
+> ⚠️ The old JSON backend hardcoded its database path to `pasta_data/database.json`, **ignoring `--data-dir`**. This version makes it follow `--data-dir` and performs a **one-time relocation**: if the new location has no database file yet while `pasta_data/database.json` exists, it is moved over and a warning is logged — so existing `--json-db` users do **not** end up staring at an empty database. Conversely, when the new location already has a database file, the old file is left untouched, so nothing is ever overwritten.
+
 The mapping is (`read_only || encrypt_server` — **not** `read_only` alone — decides whether writing requires a password):
 
 | Old field | New permission |
@@ -97,7 +99,7 @@ Note: content uploaded with the old browser-side encryption (the `secret` level)
 
 ### Other upstream bugs fixed along the way
 
-1. **The JSON backend ignored `--data-dir`** — the database path was hardcoded to `pasta_data/database.json`, so `--data-dir` had no effect with `--json-db`, and startup panicked whenever `pasta_data/` did not exist. It now follows `--data-dir`, like the SQLite backend.
+1. **The JSON backend ignored `--data-dir`** — the database path was hardcoded to `pasta_data/database.json`, so `--data-dir` had no effect with `--json-db`, and startup panicked whenever `pasta_data/` did not exist (the Docker image only creates `microbin_data/`, so `--json-db` in a container was effectively broken on startup). It now follows `--data-dir`, like the SQLite backend, and relocates the old file once (see above).
 2. **Editing a password-protected upload wrote the plaintext back to the database** — upstream's `post_edit_private` overwrote the stored value with the decrypted text, so the upload silently lost its password protection after the first edit. The content is now re-encrypted with the `read` password before being saved.
 3. **Downloading a protected upload as a zip produced undecryptable ciphertext** — `/archive/{id}` used to stuff the `.enc` files straight into the zip; with browser-side decryption gone those files are useless. It now verifies the `read` password and returns the **decrypted** contents.
 

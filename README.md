@@ -85,6 +85,8 @@ read 密码与 write 密码职责分离：read 密码额外用于加解密正文
 - **SQLite**（默认后端）：启动时用 `ALTER TABLE ... ADD COLUMN` 补齐新列，再按旧档位映射；
 - **JSON**（`--json-db`）：`load_from_file()` 先按通用 JSON 读入，逐条识别并补齐权限字段后再反序列化。
 
+> ⚠️ 旧版的 JSON 库路径是**硬编码**的 `pasta_data/database.json`，**不跟随 `--data-dir`**。本版本改为跟随 `--data-dir`，并做**一次性搬迁**：若新位置还没有库文件、而 `pasta_data/database.json` 存在，会自动把它移过去并打一条 warn。因此用 `--json-db` 的老用户升级后**不会看到空库**。反过来，新位置已有库文件时**绝不搬动**旧文件，避免覆盖。
+
 映射规则如下（注意旧代码里「写入需要密码」的判定条件是 `read_only || encrypt_server`，**不是单看 `read_only`**）：
 
 | 旧字段 | 映射到的新权限 |
@@ -102,7 +104,7 @@ read 密码与 write 密码职责分离：read 密码额外用于加解密正文
 
 重构权限模型的过程中发现并修掉了三个上游遗留问题：
 
-1. **JSON 后端忽略 `--data-dir`** —— 上游把数据库路径硬编码成 `pasta_data/database.json`，因此 `--json-db` 下 `--data-dir` 完全不生效；而且只要 `pasta_data/` 不存在，启动阶段就会在创建临时文件时 panic。现已改为与 SQLite 后端一致，跟随 `--data-dir`。
+1. **JSON 后端忽略 `--data-dir`** —— 上游把数据库路径硬编码成 `pasta_data/database.json`，因此 `--json-db` 下 `--data-dir` 完全不生效；而且只要 `pasta_data/` 不存在，启动阶段就会在创建临时文件时 panic（Docker 镜像里只建了 `microbin_data/`，所以容器中 `--json-db` 其实是启动即挂）。现已改为与 SQLite 后端一致，跟随 `--data-dir`，并对旧位置做一次性搬迁（见上文）。
 2. **编辑受密码保护的上传会把明文写回数据库** —— 上游 `post_edit_private` 用解密后的正文覆盖了存储值，导致该上传在首次编辑之后就不再受密码保护。现改为始终用 read 密码重新加密后再落库。
 3. **打包下载受保护的上传会得到无法解密的密文** —— `/archive/{id}` 原先把 `.enc` 密文直接塞进 zip；在去掉浏览器端解密之后这些文件已无意义，现改为校验 read 密码后返回**解密**的内容。
 

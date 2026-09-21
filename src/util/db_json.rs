@@ -2,8 +2,12 @@ use serde_json::json;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, BufWriter};
+use std::path::Path;
 
 use crate::{Pasta, ARGS};
+
+/// 旧版把 JSON 库硬编码在这个路径上，与 `--data-dir` 无关。
+const LEGACY_DATABASE_PATH: &str = "pasta_data/database.json";
 
 /// JSON 数据库文件的路径。
 ///
@@ -13,6 +17,41 @@ use crate::{Pasta, ARGS};
 /// 在创建临时文件时 panic。
 fn database_path() -> String {
     format!("{}/database.json", ARGS.data_dir)
+}
+
+/// 把旧版固定路径下的库文件认领到新位置。
+///
+/// 旧路径是硬编码的，所以老用户的库一定躺在 `pasta_data/database.json`；
+/// 改成跟随 `--data-dir` 之后，如果不管它，用户升级后会看到一个空库，
+/// 以为数据全丢了。因此这里做一次性搬迁。
+///
+/// 只在「新旧路径不同、新位置还没有库文件、旧位置有」时动手，因此：
+/// * 用户显式 `--data-dir pasta_data` 时两路径相同，不做任何事；
+/// * 新位置已有库文件时绝不覆盖，避免误伤。
+fn adopt_legacy_database_file(database_path: &str) {
+    if database_path == LEGACY_DATABASE_PATH || Path::new(database_path).exists() {
+        return;
+    }
+    if !Path::new(LEGACY_DATABASE_PATH).exists() {
+        return;
+    }
+
+    let adopted = std::fs::rename(LEGACY_DATABASE_PATH, database_path).or_else(|_| {
+        // 跨文件系统时 rename 会失败，退化成复制 + 删除
+        std::fs::copy(LEGACY_DATABASE_PATH, database_path)
+            .and_then(|_| std::fs::remove_file(LEGACY_DATABASE_PATH))
+    });
+
+    match adopted {
+        Ok(_) => log::warn!(
+            "检测到旧版固定路径下的 JSON 数据库 {LEGACY_DATABASE_PATH}，已移动到 {database_path}。\
+             （旧版该路径不跟随 --data-dir，故做一次性搬迁。）"
+        ),
+        Err(error) => log::error!(
+            "发现旧版 JSON 数据库 {LEGACY_DATABASE_PATH}，但移动到 {database_path} 失败：{error}。\
+             请手工移动，否则本次将以空库启动。"
+        ),
+    }
 }
 
 pub fn read_all() -> Vec<Pasta> {
@@ -106,6 +145,7 @@ fn migrate_legacy_permissions(value: &mut serde_json::Value) -> bool {
 
 fn load_from_file() -> io::Result<Vec<Pasta>> {
     let database_path = database_path();
+    adopt_legacy_database_file(&database_path);
     let file = File::open(&database_path);
     match file {
         Ok(_) => {

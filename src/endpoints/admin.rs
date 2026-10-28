@@ -62,16 +62,21 @@ pub async fn post_admin(
 
     // todo status report more sophisticated
     let mut status = "OK";
-    let mut message = "";
+    // 用 String 而不是 &str：文案要过 tr() 按请求语言取，而 tr() 返回 String。
+    let mut message = String::new();
 
     if ARGS.public_path.is_none() {
         status = "WARNING";
-        message = "Warning: No public URL set with --public-path parameter. QR code and URL Copying functions have been disabled"
+        message = crate::i18n::tr(
+            "Warning: No public URL set with --public-path parameter. QR code and URL Copying functions have been disabled",
+        );
     }
 
     if *ARGS.auth_admin_username == "admin" && *ARGS.auth_admin_password == "m1cr0b1n" {
         status = "WARNING";
-        message = "Warning: You are using the default admin login details. This is a security risk, please change them."
+        message = crate::i18n::tr(
+            "Warning: You are using the default admin login details. This is a security risk, please change them.",
+        );
     }
 
     let update;
@@ -98,7 +103,7 @@ pub async fn post_admin(
             args: &ARGS,
             status: &String::from(status),
             version_string: &format!("{}", CURRENT_VERSION.long_title),
-            message: &String::from(message),
+            message: &message,
             update: &update,
         }
         .render()

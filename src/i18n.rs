@@ -344,6 +344,10 @@ static ZH: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         "s" => "秒",
         "just now" => "刚刚",
 
+        // ---- 管理页状态消息（src/endpoints/admin.rs）----
+        "Warning: No public URL set with --public-path parameter. QR code and URL Copying functions have been disabled" => "警告：未设置 --public-path 参数。二维码与复制链接功能已停用。",
+        "Warning: You are using the default admin login details. This is a security risk, please change them." => "警告：正在使用默认的管理员账号密码。这是安全隐患，请尽快修改。",
+
         // ---- 登录 / 鉴权 ----
         "Administrator username" => "管理员用户名",
         "Administrator password." => "管理员密码。",

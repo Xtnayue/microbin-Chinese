@@ -118,9 +118,28 @@ pub struct Args {
     #[clap(short, long, env = "MICROBIN_DEFAULT_BURN_AFTER", default_value_t = 0)]
     pub default_burn_after: u16,
 
-    /// Use the full width of the browser window instead of a column that stops at 1600px.
-    #[clap(long, env = "MICROBIN_WIDE")]
+    // `min_values(0)` + `default_missing_value` 让三种写法都成立：
+    // 不传（默认 true）、裸 `--wide`（true）、`--wide=false`（false）。
+    // 只写 `action = Set` 会让裸 `--wide` 报「缺少取值」。
+    // （clap 3 没有 `num_args`，那是 clap 4 的 API。）
+    //
+    // 注意 doc comment 只能是一段（中间不能有空行），否则 clap 会把它当
+    // long_help，`--help` 优先显示 long_help，中文覆盖就失效了。
+    /// Fill the whole browser window. Set to false to constrain the page to a centred column of --max-width pixels.
+    #[clap(
+        long,
+        env = "MICROBIN_WIDE",
+        action = clap::ArgAction::Set,
+        min_values = 0,
+        max_values = 1,
+        default_missing_value = "true",
+        default_value_t = true
+    )]
     pub wide: bool,
+
+    /// Maximum page width in pixels when not filling the window. 0 (the default) means no limit. A positive value always wins over --wide.
+    #[clap(long, env = "MICROBIN_MAX_WIDTH", default_value_t = 0)]
+    pub max_width: u32,
 
     #[clap(long, env = "MICROBIN_QR")]
     pub qr: bool,
@@ -193,6 +212,24 @@ pub struct Args {
 }
 
 impl Args {
+    /// 页面内容的最大宽度，直接作为 CSS `max-width` 的值。
+    ///
+    /// 优先级：`--max-width`（>0 时）> `--wide` > 兜底 1600px。
+    /// `--max-width` 是显式给了数字，所以它压过 `--wide`；`--wide=false`
+    /// 只是「别铺满」，具体多宽用默认的 1600px。
+    ///
+    /// 返回 `String` 而非 `&str`：`max_width` 是运行时数值，没法写成 `'static`。
+    /// 注入是安全的 —— `u32` 格式化只会产生数字，后缀是常量。
+    pub fn max_width_css(&self) -> String {
+        if self.max_width > 0 {
+            format!("{}px", self.max_width)
+        } else if self.wide {
+            "100%".to_string()
+        } else {
+            "1600px".to_string()
+        }
+    }
+
     pub fn public_path_as_str(&self) -> String {
         if self.public_path.is_some() {
             self.public_path.as_ref().unwrap().to_string()
@@ -341,6 +378,7 @@ impl Args {
             enable_burn_after: self.enable_burn_after,
             default_burn_after: self.default_burn_after,
             wide: self.wide,
+            max_width: self.max_width,
             qr: self.qr,
             eternal_pasta: self.eternal_pasta,
             enable_write_password: self.enable_write_password,

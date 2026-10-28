@@ -21,13 +21,9 @@
     {%- endif %} {%- endif %}
 
 </head>
-{% if args.wide %}
-{# --wide：占满浏览器窗口，不再居中留白 #}
-<body style="box-sizing: border-box; max-width: 100%; margin: 0 auto; padding: 2rem 1rem 2rem; line-height: 1.5; font-size: 1.1em;">
-    {%- else %}
-{# 默认：跟随窗口宽度自适应，只在超宽屏上停在 1600px，避免长文一行过长 #}
-<body style="box-sizing: border-box; max-width: 1600px; margin: 0 auto; padding: 2rem 1rem 2rem; line-height: 1.5; font-size: 1.1em;">
-        {%- endif %}
+{# 宽度由 --wide / --max-width 决定，见 Args::max_width_css()。
+   min-height: 100vh 让短页面也至少铺满一屏，否则下方会露出另一层底色。 #}
+<body style="box-sizing: border-box; max-width: {{ args.max_width_css() }}; min-height: 100vh; margin: 0 auto; padding: 2rem 1rem 2rem; line-height: 1.5; font-size: 1.1em;">
         <br>
         {% if !args.hide_header %}
 

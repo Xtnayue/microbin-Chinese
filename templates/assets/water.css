@@ -49,6 +49,9 @@
 }
 
 html {
+  /* 背景必须画在 html 上才能铺满整个窗口。只画在 body 上时，页面比窗口短
+     就会在下方露出浏览器默认画布色，看上去是上下两种颜色。 */
+  background: var(--background-body);
   scrollbar-color: #aaa #fff;
   scrollbar-color: var(--scrollbar-thumb) var(--background-body);
   scrollbar-width: thin

@@ -205,7 +205,7 @@
             {%- endif %}
         </div>
 
-        <div style="margin-top: 0.6rem;">
+        <div>
             <label for="write_access">{{ "Write permission"|t }}<sup> <a href="{{ args.public_path_as_str() }}/guide#write">?</a></sup></label><br>
             <select style="width: 100%;" name="write_access" id="write_access">
                 <option value="allow"{% if default_permissions.write.as_str() == "allow" %} selected{% endif %}>{{ "Anyone (no password)"|t }}</option>
@@ -222,7 +222,7 @@
             {%- endif %}
         </div>
 
-        <div style="margin-top: 0.6rem;">
+        <div>
             <label for="listed">{{ "List permission"|t }}<sup> <a href="{{ args.public_path_as_str() }}/guide#list">?</a></sup></label><br>
             <select style="width: 100%;" name="listed" id="listed">
                 <option value="yes"{% if default_permissions.listed %} selected{% endif %}>{{ "Listed publicly"|t }}</option>
@@ -482,7 +482,9 @@
         display: grid;
         grid-gap: 10px;
         grid-template-columns: repeat(auto-fit, 152px);
-        grid-template-rows: repeat(1, 90px);
+        /* 不能用固定行高：选中「需要密码」后会多出一行密码输入框，
+           固定 90px 会让它溢出并压到下面的内容上。 */
+        grid-template-rows: auto;
         margin-bottom: 1rem;
     }
 

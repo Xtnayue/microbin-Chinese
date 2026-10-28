@@ -108,7 +108,11 @@ Note: content uploaded with the old browser-side encryption (the `secret` level)
 
 ### Responsive layout
 
-Upstream pinned `<body>` to `max-width: 800px` (1080px with `--wide`), so a wide window only ever showed a narrow centred column — multi-column tables such as the admin page were squeezed into a tall strip. The layout now follows the window width and only stops at 1600px on very wide screens, to keep paragraphs readable; `--wide` fills the window entirely. Narrow (mobile) behaviour is unchanged.
+Upstream pinned `<body>` to `max-width: 800px` (1080px with `--wide`), so a wide window only ever showed a narrow centred column — multi-column tables such as the admin page were squeezed into a tall strip.
+
+The page now **fills the whole window by default** (`--wide` is on by default). Use `--max-width` to constrain it to a pixel value (it wins over `--wide`), or `--wide=false` to fall back to a 1600px centred column. The background is now painted on `<html>` as well, so short pages no longer show a second colour below the content.
+
+Two layout bugs were fixed along the way: only the write and list permission labels carried a `margin-top`, which put them 9.6px lower than the read label; and the fixed row height of `#settings` let content overflow once the "requires a password" option revealed the extra password field.
 
 ### Other upstream bugs fixed along the way
 

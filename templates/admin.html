@@ -48,21 +48,27 @@
 
 
 <h3>{{ "Uploads"|t }}</h3>
+{# 三张表都套 overflow-x: auto + min-width，与 list.html 一致：
+   窄屏下宁可横向滚动，也不要把 9 列挤成每列 76px、表头折成两行。 #}
+<div style="width: 100%; overflow-x: auto;">
 {% if args.pure_html %}
-<table border="1" style="width: 100%;">
+<table border="1" style="width: 100%; min-width: 900px;">
     {% else %}
-    <table style="width: 100%; font-size: smaller;">
+    <table style="width: 100%; min-width: 900px; font-size: smaller;">
         {% endif %}
         <thead>
-            <th style="width: 15%;">{{ "Key"|t }}</th>
-            <th style="width: 15%;">{{ "Valid"|t }}</th>
-            <th style="width: 8%;">{{ "Size"|t }}</th>
+            {# 列宽按表头文字量分配：`read 权限`/`write 权限`/`list 权限` 是
+               中英混排，比纯中文宽，原来的 8%/5% 会把「限」挤到第二行。
+               实测 900px 下 write/list 需要 ~74px 内容宽才不折行。 #}
+            <th style="width: 13%;">{{ "Key"|t }}</th>
+            <th style="width: 13%;">{{ "Valid"|t }}</th>
+            <th style="width: 7%;">{{ "Size"|t }}</th>
             <th>{{ "Read permission"|t }}</th>
-            <th style="width: 8%;">{{ "Write permission"|t }}</th>
-            <th style="width: 5%;">{{ "List permission"|t }}</th>
-            <th style="width: 8%;">{{ "Content"|t }}</th>
+            <th style="width: 10%;">{{ "Write permission"|t }}</th>
+            <th style="width: 10%;">{{ "List permission"|t }}</th>
+            <th style="width: 7%;">{{ "Content"|t }}</th>
             <th>{{ "Hits"|t }}</th>
-            <th style="width: 8%;">
+            <th style="width: 7%;">
                 <!-- Actions -->
             </th>
         </thead>
@@ -127,22 +133,24 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     <br>
     <h3>{{ "URL Redirects"|t }}</h3>
+    <div style="width: 100%; overflow-x: auto;">
     {% if args.pure_html %}
-    <table border="1" style="width: 100%;">
+    <table border="1" style="width: 100%; min-width: 900px;">
         {% else %}
-        <table style="width: 100%; font-size: smaller;">
+        <table style="width: 100%; min-width: 900px; font-size: smaller;">
             {% endif %}
             <thead>
-                <th style="width: 15%;">{{ "Key"|t }}</th>
-                <th style="width: 15%;">{{ "Valid"|t }}</th>
+                <th style="width: 13%;">{{ "Key"|t }}</th>
+                <th style="width: 13%;">{{ "Valid"|t }}</th>
                 <th>{{ "Read permission"|t }}</th>
-                <th style="width: 8%;">{{ "Write permission"|t }}</th>
-                <th style="width: 5%;">{{ "List permission"|t }}</th>
-                <th style="width: 8%;">{{ "Content"|t }}</th>
+                <th style="width: 10%;">{{ "Write permission"|t }}</th>
+                <th style="width: 10%;">{{ "List permission"|t }}</th>
+                <th style="width: 7%;">{{ "Content"|t }}</th>
                 <th>{{ "Hits"|t }}</th>
-                <th style="width: 8%;">
+                <th style="width: 7%;">
                     <!-- Actions -->
                 </th>
             </thead>
@@ -205,6 +213,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         <br>
 
 
@@ -212,10 +221,11 @@
         <p style="font-size: 0.85em; opacity: 0.75; margin-top: -0.5rem;">
             {{ "These values are read once at startup. Change the flag or environment variable and restart the process; the admin page only displays the effective result."|t }}
         </p>
+        <div style="width: 100%; overflow-x: auto;">
         {% if args.pure_html %}
-        <table border="1" style="width: 100%;">
+        <table border="1" style="width: 100%; min-width: 720px;">
             {% else %}
-            <table style="width: 100%; font-size: smaller;">
+            <table style="width: 100%; min-width: 720px; font-size: smaller;">
                 {% endif %}
                 <thead>
                     <tr>
@@ -469,6 +479,7 @@
             </tr>
                 </tbody>
             </table>
+            </div>
         {% include "footer.html" %}
         <script>
             const copyURLBtns = document.getElementsByClassName("copy-button");

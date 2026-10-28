@@ -518,7 +518,7 @@ static ZH_HELP: &[(&str, &str)] = &[
     ("gc-days", "垃圾回收保留天数"),
     ("enable-burn-after", "启用「阅后即焚」功能"),
     ("default-burn-after", "默认的阅后即焚次数"),
-    ("wide", "占满整个浏览器窗口（默认开启）"),
+    ("wide", "占满整个浏览器窗口（默认）；设为 false 则限宽，宽度取 --max-width（为 0 时用 1600px）"),
     ("max-width", "页面最大宽度（像素），0 表示不限制；设置后优先于 --wide"),
     ("qr", "为上传内容显示二维码"),
     ("eternal-pasta", "允许创建永不过期的上传"),

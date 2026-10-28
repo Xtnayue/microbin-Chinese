@@ -121,17 +121,20 @@ pub struct Args {
     // `min_values(0)` + `default_missing_value` 让三种写法都成立：
     // 不传（默认 true）、裸 `--wide`（true）、`--wide=false`（false）。
     // 只写 `action = Set` 会让裸 `--wide` 报「缺少取值」。
+    // `require_equals` 只影响取值写法：`--wide=false` 可以、`--wide false` 不行，
+    // 好处是 `--help` 里显示成 `--wide[=<WIDE>]` 而不是误导性的 `[<WIDE>...]`。
     // （clap 3 没有 `num_args`，那是 clap 4 的 API。）
     //
     // 注意 doc comment 只能是一段（中间不能有空行），否则 clap 会把它当
     // long_help，`--help` 优先显示 long_help，中文覆盖就失效了。
-    /// Fill the whole browser window. Set to false to constrain the page to a centred column of --max-width pixels.
+    /// Fill the whole browser window. Set to false to constrain the page to a centred column, whose width comes from --max-width (1600px when that is 0).
     #[clap(
         long,
         env = "MICROBIN_WIDE",
         action = clap::ArgAction::Set,
         min_values = 0,
         max_values = 1,
+        require_equals = true,
         default_missing_value = "true",
         default_value_t = true
     )]

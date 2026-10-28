@@ -69,9 +69,7 @@ pub struct Args {
     #[clap(short, long, env="MICROBIN_BIND", default_value_t = IpAddr::from([0, 0, 0, 0]))]
     pub bind: IpAddr,
 
-    /// 是否允许把上传的 `list` 权限设为 `no`（即不出现在公开列表中）。
-    ///
-    /// 同时是服务端策略：关掉之后，直接向 `/upload` 提交 `list=no` 会被 400 拒绝。
+    /// Whether an upload may be set to `list=no` (hidden from the public listing). This is also enforced server-side: posting `list=no` to /upload while the flag is false is rejected with HTTP 400.
     #[clap(long, env = "MICROBIN_ENABLE_UNLISTED", action = clap::ArgAction::Set, default_value_t = true)]
     pub enable_unlisted: bool,
 
@@ -120,15 +118,11 @@ pub struct Args {
     #[clap(long, env = "MICROBIN_ETERNAL_PASTA")]
     pub eternal_pasta: bool,
 
-    /// 是否允许把上传的 `write` 权限设为 `password`。
-    ///
-    /// 同时是服务端策略：关掉之后，直接向 `/upload` 提交 `write=password` 会被 400 拒绝。
+    /// Whether the `write` permission may be set to `password`. This is also enforced server-side: posting `write=password` to /upload while the flag is false is rejected with HTTP 400.
     #[clap(long, env = "MICROBIN_ENABLE_WRITE_PASSWORD", action = clap::ArgAction::Set, default_value_t = true)]
     pub enable_write_password: bool,
 
-    /// 是否允许把上传的 `read` 权限设为 `password`。
-    ///
-    /// 同时是服务端策略：关掉之后，直接向 `/upload` 提交 `read=password` 会被 400 拒绝。
+    /// Whether the `read` permission may be set to `password`. This is also enforced server-side: posting `read=password` to /upload while the flag is false is rejected with HTTP 400.
     #[clap(long, env = "MICROBIN_ENABLE_READ_PASSWORD", action = clap::ArgAction::Set, default_value_t = true)]
     pub enable_read_password: bool,
 
@@ -159,8 +153,7 @@ pub struct Args {
     #[clap(long, env = "MICROBIN_DISABLE_UPDATE_CHECKING")]
     pub disable_update_checking: bool,
 
-    /// 新建上传时的默认权限组合，逗号分隔的 `键=值`，例如
-    /// `read=allow,write=password,list=no`。
+    /// Default permissions for new uploads, comma-separated `key=value`, e.g. `read=allow,write=password,list=no`.
     #[clap(long, env = "MICROBIN_DEFAULT_PERMISSIONS", default_value = "read=allow,write=allow,list=yes")]
     pub default_permissions: String,
 
@@ -180,12 +173,11 @@ pub struct Args {
 
 
 
-    /// 新建上传页附件视图的默认选项：gallery（画廊）、list（列表）或 stream（流式）。
-    /// URL 上的 `?view=` 优先于它；无法识别的取值一律回退 gallery。
+    /// Default attachment layout on the upload page: gallery, list or stream. An explicit `?view=` in the URL still wins; unrecognised values fall back to gallery.
     #[clap(long, env = "MICROBIN_DEFAULT_VIEW", default_value = "gallery")]
     pub default_view: String,
 
-    /// 界面语言：en（英文）或 zh（中文）。默认 en。
+    /// Interface language: en (English) or zh (Chinese). Defaults to en.
     #[clap(long, env = "MICROBIN_LANGUAGE", default_value = "en")]
     pub language: String,
 }

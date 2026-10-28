@@ -280,7 +280,8 @@ pub fn detect_lang_from_env() -> Lang {
     Lang::En
 }
 
-/// 命令行参数的帮助文案：键为 clap 的参数 id（即结构体字段名），值为中文说明。
+/// 命令行参数的帮助文案：键为参数的 **long 名称**（如 `default-view`），
+/// 值为中文说明。`localize_command` 会用 `longs.contains()` 核对存在性。
 static ZH_HELP: &[(&str, &str)] = &[
     ("auth-basic-username", "启用 HTTP Basic 认证时要求的用户名"),
     ("auth-basic-password", "启用 HTTP Basic 认证时要求的密码"),

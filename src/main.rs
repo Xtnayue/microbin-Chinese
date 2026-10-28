@@ -79,6 +79,10 @@ async fn main() -> std::io::Result<()> {
         ARGS.port.to_string()
     );
 
+    for warning in ARGS.config_warnings() {
+        log::warn!("Config check: {}", warning);
+    }
+
     match fs::create_dir_all(format!("{}/public", ARGS.data_dir)) {
         Ok(dir) => dir,
         Err(error) => {

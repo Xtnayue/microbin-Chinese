@@ -78,8 +78,13 @@ CLI flags changed accordingly:
 - Removed: `--private`, `--enable-readonly`, `--default-privacy`, `--encryption-client-side`, `--encryption-server-side`
 - Added: `--enable-unlisted`, `--enable-read-password`, `--enable-write-password`
 - Added: `--default-permissions=read=allow,write=allow,list=yes` (comma-separated `key=value`)
+- Activated: `--default-view=gallery|list|stream` (the flag existed upstream, but the template hardcoded the value, so it never had any effect — see "Other upstream bugs fixed along the way" below)
 
-> Like their upstream counterparts, the three `--enable-*` flags **only control the options offered on the new-upload form; they are not a server-side policy**. Posting a disabled value straight to `/upload` is still accepted. This matches upstream: `--encryption-client-side`, `--encryption-server-side` and `--private` were template-only as well, and the single server-side guard (`--enable-readonly`) was a **silent downgrade** (posting `readonly` produced a writable upload) rather than a rejection. This fork keeps the same "UI switch" role and just states it plainly in the help text, so the flags are not mistaken for enforcement.
+> The three `--enable-*` flags are **both a form switch and a server-side policy**. Turning one off removes the option from the new-upload form, and posting that disabled value straight to `/upload` is rejected with **HTTP 400** plus a readable message. All three default to `true`, in which case these guards never fire and behaviour is exactly as before.
+>
+> Why reject rather than do what upstream did — **silently downgrade**? A downgrade turns all three cases into a result that is **more open than the user asked for**: posting `read=password` and getting `allow` means the user believes the content is encrypted when it is stored in plaintext; posting `write=password` and getting `allow` means the user believes nobody else can modify it when anybody can; posting `list=no` and getting `list=yes` means the user believes the upload is not publicly listed when it is on `/list`. The severity differs, but the direction is the same: the protection the user asked for did not take effect. Upstream's `--enable-readonly` was exactly this pattern (posting `readonly` after disabling it produced a publicly writable upload). Rejection collapses all three into one outcome — no upload is created, the client gets a 400 and a readable message, and there is no state in which the user thinks something is protected when it is not.
+>
+> There is also a startup self-check: if `--default-permissions` selects a level that happens to be disabled (e.g. `read=password` with `--enable-read-password=false`), the form does not render that option and the browser silently falls back to the first option in the group. The program does **not** change behaviour — it only logs a `WARN` at startup naming the level that will actually apply.
 
 **Upgrading is automatic.** Existing data is migrated on read by both backends, and the migration is idempotent (restarting does not migrate twice or alter already-migrated data):
 
@@ -103,10 +108,13 @@ Note: content uploaded with the old browser-side encryption (the `secret` level)
 
 ### Other upstream bugs fixed along the way
 
+Five upstream leftovers were found and fixed while reworking the permission model:
+
 1. **The JSON backend ignored `--data-dir`** — the database path was hardcoded to `pasta_data/database.json`, so `--data-dir` had no effect with `--json-db`, and startup panicked whenever `pasta_data/` did not exist (the Docker image only creates `microbin_data/`, so `--json-db` in a container was effectively broken on startup). It now follows `--data-dir`, like the SQLite backend, and relocates the old file once (see above).
 2. **Editing a password-protected upload wrote the plaintext back to the database** — upstream's `post_edit_private` overwrote the stored value with the decrypted text, so the upload silently lost its password protection after the first edit. The content is now re-encrypted with the `read` password before being saved.
 3. **Downloading a protected upload as a zip produced undecryptable ciphertext** — `/archive/{id}` used to stuff the `.enc` files straight into the zip; with browser-side decryption gone those files are useless. It now verifies the `read` password and returns the **decrypted** contents.
 4. **URL short links ignored the read permission and silently broke** — `/url/{id}` and `/u/{id}` returned `content` verbatim as the `Location` header. With `read=password` that `content` is ciphertext, so the browser was redirected onto a blob of ciphertext and the link was dead (not a plaintext leak). They now redirect to the password page `/auth_url/{id}` first, and only decrypt and forward to the target once the password checks out. `read=allow` short links behave exactly as before.
+5. **`--default-view` was a dead flag** — the flag existed upstream (defined in `args.rs`, visible in `--help`), but `templates/upload.html` hardcoded its fallback to `'gallery'` and nothing in the repository ever read it, so setting it did nothing. The value is now rendered into the page script by the server and **whitelisted** (only `stream` / `list` / `gallery` are accepted, anything else falls back to `gallery`). The whitelist is not optional: the value is interpolated directly into a JS string literal (the template declares `escape = "none"`), so passing it through verbatim would let `--default-view "x'; alert(1)//"` break the entire page script. An explicit `?view=` in the URL still takes precedence over this default.
 
 ### Bilingual interface
 

@@ -81,8 +81,13 @@ read 密码与 write 密码职责分离：read 密码额外用于加解密正文
 - 移除 `--private`、`--enable-readonly`、`--default-privacy`、`--encryption-client-side`、`--encryption-server-side`
 - 新增 `--enable-unlisted`、`--enable-read-password`、`--enable-write-password`
 - 新增 `--default-permissions=read=allow,write=allow,list=yes`（逗号分隔的 `键=值`，键为 `read` / `write` / `list`）
+- 激活 `--default-view=gallery|list|stream`（该参数上游就有，但模板把它写死了，因此从未生效；见下文「顺带修复的上游问题」）
 
-> 三个 `--enable-*` 与上游的同类开关一样，**只控制新建上传界面上的选项，不是服务端策略**：直接向 `/upload` 提交一个被禁用的取值仍然会被接受。这与上游行为一致 —— 上游的 `--encryption-client-side` / `--encryption-server-side` / `--private` 同样只作用于模板，仅 `--enable-readonly` 带一个服务端守卫，而且那是**静默降级**（提交 `readonly` 会被当成可写）而非拒绝。本分支沿用了「界面开关」这一定位，并把帮助文案写清楚，以免被误当成策略校验。
+> 三个 `--enable-*` **既是界面开关，也是服务端策略**。关掉某一项后，新建表单不再渲染该选项；同时，绕过界面直接向 `/upload` 提交这个被禁用的取值会被 **HTTP 400** 拒绝，并返回一句可读的说明。三个开关默认都是 `true`，此时守卫一次都不会触发，行为与从前完全一致。
+>
+> 为什么是「拒绝」而不是上游那种「静默降级」：降级会把三种情况全部变成**比用户预期更开放**的结果 —— 提交 `read=password` 被降级成 `allow`，用户以为正文已加密，实际是明文落库；提交 `write=password` 被降级成 `allow`，用户以为别人改不了，实际谁都能改；提交 `list=no` 被降级成 `list=yes`，用户以为没有公开列出，实际已经列在 `/list` 上。三者严重程度不同，但方向一致：都是「用户设想的保护没有生效」。上游 `--enable-readonly` 正是这种写法（关掉之后提交 `readonly`，得到的反而是公开可写的上传）。拒绝则把三者统一成同一个结果 —— 上传不会创建，客户端收到 400 和一句可读的说明，不存在「以为保护了其实没有」的状态。
+>
+> 另有一条启动自检：若 `--default-permissions` 指定的默认档位恰好落在被关掉的选项上（例如 `read=password` 配 `--enable-read-password=false`），表单不会渲染那个选项，浏览器会静默回退到同组第一项。程序**不修改行为**，只在启动日志里打一条 `WARN`，说明实际会生效的档位。
 
 **旧数据无需手工处理**，两个后端都会在读取时自动迁移，且**幂等**（重复启动不会二次迁移，也不会改动已迁移的数据）：
 
@@ -106,12 +111,13 @@ read 密码与 write 密码职责分离：read 密码额外用于加解密正文
 
 #### 三、顺带修复的上游问题
 
-重构权限模型的过程中发现并修掉了四个上游遗留问题：
+重构权限模型的过程中发现并修掉了五个上游遗留问题：
 
 1. **JSON 后端忽略 `--data-dir`** —— 上游把数据库路径硬编码成 `pasta_data/database.json`，因此 `--json-db` 下 `--data-dir` 完全不生效；而且只要 `pasta_data/` 不存在，启动阶段就会在创建临时文件时 panic（Docker 镜像里只建了 `microbin_data/`，所以容器中 `--json-db` 其实是启动即挂）。现已改为与 SQLite 后端一致，跟随 `--data-dir`，并对旧位置做一次性搬迁（见上文）。
 2. **编辑受密码保护的上传会把明文写回数据库** —— 上游 `post_edit_private` 用解密后的正文覆盖了存储值，导致该上传在首次编辑之后就不再受密码保护。现改为始终用 read 密码重新加密后再落库。
 3. **打包下载受保护的上传会得到无法解密的密文** —— `/archive/{id}` 原先把 `.enc` 密文直接塞进 zip；在去掉浏览器端解密之后这些文件已无意义，现改为校验 read 密码后返回**解密**的内容。
 4. **URL 短链不校验读权限，受保护时静默失效** —— `/url/{id}` 与 `/u/{id}` 直接把 `content` 作为 `Location` 返回。`read=password` 时 `content` 是密文，于是浏览器被跳到一段密文上，链接坏掉（不是明文泄露）。现改为先引导到密码页 `/auth_url/{id}`，校验通过后解密目标地址再跳转；`read=allow` 的短链行为不变。
+5. **`--default-view` 是个死参数** —— 该参数在上游就存在（`args.rs` 里有定义、`--help` 里也能看到），但 `templates/upload.html` 把兜底值硬编码成了 `'gallery'`，全仓没有任何一处读它，因此设了等于没设。现已改为由服务端取值渲染进页面脚本，并对取值做**白名单归一化**（只接受 `stream` / `list` / `gallery`，其余一律回退 `gallery`）。白名单不是可选项：该值会被直接插进 JS 的字符串字面量（该模板声明了 `escape = "none"`），若原样透传，`--default-view "x'; alert(1)//"` 足以破坏整页脚本。URL 上的 `?view=` 仍然优先于该默认值。
 
 ### 本地构建（Windows）
 

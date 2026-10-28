@@ -275,6 +275,9 @@ pasta.file_embeddable() && !pasta.attachments.is_some() %}
   const galleryView = document.getElementById('gallery-view');
   const listView = document.getElementById('list-view');
   const viewSelector = document.getElementById('view-selector');
+  // 服务端 --default-view 的取值。已由 args.default_view_as_str() 做白名单
+  // 归一化（只可能是 stream / list / gallery），因此可安全地插进字符串字面量。
+  const defaultView = '{{ args.default_view_as_str() }}';
 
   function applyViewChange(newView) {
     if (galleryView && listView) {
@@ -295,7 +298,7 @@ pasta.file_embeddable() && !pasta.attachments.is_some() %}
 
   const currentView = new URLSearchParams(window.location.search).get('view');
   if (viewSelector) {
-    viewSelector.value = currentView || 'gallery';
+    viewSelector.value = currentView || defaultView;
     viewSelector.addEventListener('change', (e) => {
       const newView = e.target.value;
       const currentUrl = new URL(window.location.href);
@@ -304,7 +307,7 @@ pasta.file_embeddable() && !pasta.attachments.is_some() %}
       applyViewChange(newView);
     });
   }
-  applyViewChange(currentView || 'gallery');
+  applyViewChange(currentView || defaultView);
 // {% endif %}
 
 </script>

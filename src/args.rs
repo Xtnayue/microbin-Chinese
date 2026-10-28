@@ -70,6 +70,8 @@ pub struct Args {
     pub bind: IpAddr,
 
     /// 是否允许把上传的 `list` 权限设为 `no`（即不出现在公开列表中）。
+    ///
+    /// 同时是服务端策略：关掉之后，直接向 `/upload` 提交 `list=no` 会被 400 拒绝。
     #[clap(long, env = "MICROBIN_ENABLE_UNLISTED", action = clap::ArgAction::Set, default_value_t = true)]
     pub enable_unlisted: bool,
 
@@ -119,10 +121,14 @@ pub struct Args {
     pub eternal_pasta: bool,
 
     /// 是否允许把上传的 `write` 权限设为 `password`。
+    ///
+    /// 同时是服务端策略：关掉之后，直接向 `/upload` 提交 `write=password` 会被 400 拒绝。
     #[clap(long, env = "MICROBIN_ENABLE_WRITE_PASSWORD", action = clap::ArgAction::Set, default_value_t = true)]
     pub enable_write_password: bool,
 
     /// 是否允许把上传的 `read` 权限设为 `password`。
+    ///
+    /// 同时是服务端策略：关掉之后，直接向 `/upload` 提交 `read=password` 会被 400 拒绝。
     #[clap(long, env = "MICROBIN_ENABLE_READ_PASSWORD", action = clap::ArgAction::Set, default_value_t = true)]
     pub enable_read_password: bool,
 
@@ -174,6 +180,8 @@ pub struct Args {
 
 
 
+    /// 新建上传页附件视图的默认选项：gallery（画廊）、list（列表）或 stream（流式）。
+    /// URL 上的 `?view=` 优先于它；无法识别的取值一律回退 gallery。
     #[clap(long, env = "MICROBIN_DEFAULT_VIEW", default_value = "gallery")]
     pub default_view: String,
 
@@ -199,6 +207,58 @@ impl Args {
         } else {
             String::from("")
         }
+    }
+
+    /// 新建上传页附件视图的默认选项。
+    ///
+    /// `--default-view` 的取值会被**直接插进页面 JS 的字符串字面量**，因此这里做
+    /// 白名单校验：只接受与视图选择器一致的三个取值，其余一律回退 `gallery`。
+    /// 这样运维即使传进来一个带引号的值，也不会破坏整页脚本。
+    pub fn default_view_as_str(&self) -> &'static str {
+        match self.default_view.as_str() {
+            "stream" => "stream",
+            "list" => "list",
+            _ => "gallery",
+        }
+    }
+
+    /// 启动时自检：找出**自相矛盾**的配置组合，返回给调用方打印。
+    ///
+    /// 目前只覆盖一类问题：`--default-permissions` 里指定的默认档位，恰好是某个
+    /// 被 `--enable-*` 关掉的选项。此时新建表单不会渲染那个选项，浏览器会回退到
+    /// 同组的第一个选项，于是管理员配置的默认值被**静默改写**成另一个值。
+    ///
+    /// 这里只报告、不修改行为：默认值该不该生效是运维的决定，程序只负责让他知道。
+    /// 返回值按固定顺序排列，便于测试断言。
+    pub fn config_warnings(&self) -> Vec<&'static str> {
+        let defaults = self.default_permissions();
+        let mut warnings = Vec::new();
+
+        if !self.enable_read_password && defaults.read == ReadAccess::Password {
+            warnings.push(
+                "MICROBIN_DEFAULT_PERMISSIONS asks for read=password, but the read \
+                 password option is disabled (MICROBIN_ENABLE_READ_PASSWORD=false). \
+                 The new-upload form will fall back to read=allow."
+            );
+        }
+
+        if !self.enable_write_password && defaults.write == WriteAccess::Password {
+            warnings.push(
+                "MICROBIN_DEFAULT_PERMISSIONS asks for write=password, but the write \
+                 password option is disabled (MICROBIN_ENABLE_WRITE_PASSWORD=false). \
+                 The new-upload form will fall back to write=allow."
+            );
+        }
+
+        if !self.enable_unlisted && !defaults.listed {
+            warnings.push(
+                "MICROBIN_DEFAULT_PERMISSIONS asks for list=no, but unlisted uploads \
+                 are disabled (MICROBIN_ENABLE_UNLISTED=false). \
+                 The new-upload form will fall back to list=yes."
+            );
+        }
+
+        warnings
     }
 
     pub fn max_expiry_index(&self) -> usize {

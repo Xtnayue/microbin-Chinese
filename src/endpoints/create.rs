@@ -330,6 +330,30 @@ pub async fn create(
     let id = new_pasta.id;
 
     // ---- 应用三项权限 ----
+    // 三个界面开关的服务端守卫。
+    // 它们本来只控制新建表单渲染哪些选项；若管理员显式关掉了某一项，却仍有人
+    // 绕过界面直接提交该取值，这里明确拒绝。之所以不用上游那种「静默降级成
+    // 另一个值」的写法，是因为那会让用户的意图被**反向执行**且毫无提示
+    // （上游 `--enable-readonly` 就是这样：关掉后提交 readonly 反而得到公开可改）。
+    // 开关默认都是 true，此时这三段判断一次都不会触发，行为与从前完全一致。
+    if !ARGS.enable_read_password && new_pasta.read_access == ReadAccess::Password {
+        return Err(ErrorBadRequest(crate::i18n::tr(
+            "The read password option is disabled by the administrator.",
+        )));
+    }
+
+    if !ARGS.enable_write_password && new_pasta.write_access == WriteAccess::Password {
+        return Err(ErrorBadRequest(crate::i18n::tr(
+            "The write password option is disabled by the administrator.",
+        )));
+    }
+
+    if !ARGS.enable_unlisted && !new_pasta.listed {
+        return Err(ErrorBadRequest(crate::i18n::tr(
+            "Unlisted uploads are disabled by the administrator.",
+        )));
+    }
+
     // read 权限：声明要密码却没给密码时，绝不静默降级为公开，直接拒绝。
     if new_pasta.read_access == ReadAccess::Password {
         if read_password.is_empty() {

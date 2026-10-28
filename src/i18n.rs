@@ -325,10 +325,24 @@ static ZH: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         "Video" => "视频",
         "File" => "文件",
         "Read" => "已阅读",
-        "time, last" => "次，最近一次",
-        "times, last" => "次，最近一次",
+        // 「已读 5 次，最近 10秒前」——「前」由 pasta.rs 的 format_ago 补，
+        // 所以这里不能写成「最近一次」，否则会出现「最近一次 10秒前」。
+        "time, last" => "次，最近",
+        "times, last" => "次，最近",
         "hits" => "次访问",
-        "last" => "最近",
+
+        // ---- 相对时间（见 pasta.rs 的 format_ago）----
+        // 只翻译单位词，后缀「前」由代码按语言拼。缩写与全称在中文里同形，
+        // 因为中文没有「s」这种缩写写法。
+        "days" => "天",
+        "hours" => "小时",
+        "minutes" => "分钟",
+        "seconds" => "秒",
+        "d" => "天",
+        "h" => "小时",
+        "m" => "分钟",
+        "s" => "秒",
+        "just now" => "刚刚",
 
         // ---- 登录 / 鉴权 ----
         "Administrator username" => "管理员用户名",

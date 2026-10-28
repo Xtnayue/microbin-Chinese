@@ -7,6 +7,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::args::ARGS;
+use crate::i18n::{self, tr};
 use crate::util::animalnumbers::to_animal_names;
 use crate::util::hashids::to_hashids;
 use crate::util::syntaxhighlighter::html_highlight;
@@ -316,46 +317,18 @@ impl Pasta {
         }
     }
 
+    /// 距上次读取的完整文案，例如「10 seconds ago」/「10 秒前」。
     pub fn last_read_time_ago_as_string(&self) -> String {
-        // get current unix time in seconds
-        let timenow: i64 = match SystemTime::now().duration_since(UNIX_EPOCH) {
-            Ok(n) => n.as_secs(),
-            Err(_) => {
-                log::error!("SystemTime before UNIX EPOCH!");
-                0
-            }
-        } as i64;
-
-        // get seconds since last read and convert it to days
-        let days = ((timenow - self.last_read) / 86400) as u16;
-        if days > 1 {
-            return format!("{} days ago", days);
-        };
-
-        // it's less than 1 day, let's do hours then
-        let hours = ((timenow - self.last_read) / 3600) as u16;
-        if hours > 1 {
-            return format!("{} hours ago", hours);
-        };
-
-        // it's less than 1 hour, let's do minutes then
-        let minutes = ((timenow - self.last_read) / 60) as u16;
-        if minutes > 1 {
-            return format!("{} minutes ago", minutes);
-        };
-
-        // it's less than 1 minute, let's do seconds then
-        let seconds = (timenow - self.last_read) as u16;
-        if seconds > 1 {
-            return format!("{} seconds ago", seconds);
-        };
-
-        // it's less than 1 second?????
-        String::from("just now")
+        Self::ago_as_string(self.seconds_since_last_read(), false)
     }
 
+    /// 同上，但单位用缩写（管理页表格列窄）。例如「10 s ago」/「10 秒前」。
     pub fn short_last_read_time_ago_as_string(&self) -> String {
-        // get current unix time in seconds
+        Self::ago_as_string(self.seconds_since_last_read(), true)
+    }
+
+    /// 距上次读取经过了多少秒。系统时钟早于 UNIX EPOCH 时按 0 处理。
+    fn seconds_since_last_read(&self) -> i64 {
         let timenow: i64 = match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(n) => n.as_secs(),
             Err(_) => {
@@ -363,33 +336,42 @@ impl Pasta {
                 0
             }
         } as i64;
+        timenow - self.last_read
+    }
 
-        // get seconds since last read and convert it to days
-        let days = ((timenow - self.last_read) / 86400) as u16;
+    /// 相对时间的本地化。
+    ///
+    /// 英文是「N 单位 ago」，中文是「N 单位前」——后缀在单位词之后，位置随语言变，
+    /// 所以只把**单位词**交给翻译表，后缀在这里按语言拼。整句没法塞进翻译表，
+    /// 因为数字是变量。
+    ///
+    /// 上游把这两份逻辑各写了一遍（只有单位缩写不同），中文文案漏改就成了
+    /// 「最近 45 s ago」。合并成一个实现，避免以后再漏一处。
+    ///
+    /// 阈值沿用上游的 `> 1`：正好 1 天会显示成「24 hours ago」，这是上游既有
+    /// 行为，这里不改，免得中文与英文环境出现差异。
+    fn ago_as_string(seconds_ago: i64, short: bool) -> String {
+        let days = (seconds_ago / 86400) as u16;
         if days > 1 {
-            return format!("{} d ago", days);
-        };
+            return format_ago(days, if short { tr("d") } else { tr("days") });
+        }
 
-        // it's less than 1 day, let's do hours then
-        let hours = ((timenow - self.last_read) / 3600) as u16;
+        let hours = (seconds_ago / 3600) as u16;
         if hours > 1 {
-            return format!("{} h ago", hours);
-        };
+            return format_ago(hours, if short { tr("h") } else { tr("hours") });
+        }
 
-        // it's less than 1 hour, let's do minutes then
-        let minutes = ((timenow - self.last_read) / 60) as u16;
+        let minutes = (seconds_ago / 60) as u16;
         if minutes > 1 {
-            return format!("{} m ago", minutes);
-        };
+            return format_ago(minutes, if short { tr("m") } else { tr("minutes") });
+        }
 
-        // it's less than 1 minute, let's do seconds then
-        let seconds = (timenow - self.last_read) as u16;
+        let seconds = seconds_ago as u16;
         if seconds > 1 {
-            return format!("{} s ago", seconds);
-        };
+            return format_ago(seconds, if short { tr("s") } else { tr("seconds") });
+        }
 
-        // it's less than 1 second?????
-        String::from("just now")
+        tr("just now")
     }
 
     pub fn last_read_days_ago(&self) -> u16 {
@@ -433,5 +415,15 @@ impl Pasta {
 impl fmt::Display for Pasta {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.content)
+    }
+}
+
+/// 「N 单位前」/「N 单位 ago」。`unit` 是**已经翻译过**的单位词。
+///
+/// 中英文的差别只在后缀位置，所以单位词由调用方查表，这里只负责拼装。
+fn format_ago(n: u16, unit: String) -> String {
+    match i18n::lang() {
+        i18n::Lang::Zh => format!("{}{}前", n, unit),
+        i18n::Lang::En => format!("{} {} ago", n, unit),
     }
 }

@@ -106,9 +106,9 @@
                 </td>
                 <td>
                     {% if args.show_read_stats %} {% if pasta.read_count == 1 %}
-                    <span style="font-size: small">{{pasta.read_count}} {{ "hits"|t }}<br>{{ "last"|t }} {{pasta.short_last_read_time_ago_as_string()}}</span>
+                    <span style="font-size: small">{{pasta.read_count}} {{ "hits"|t }}<br>{{pasta.short_last_read_time_ago_as_string()}}</span>
                     {%- else %}
-                    <span style="font-size: small">{{pasta.read_count}} {{ "hits"|t }}<br>{{ "last"|t }} {{pasta.short_last_read_time_ago_as_string()}}</span>
+                    <span style="font-size: small">{{pasta.read_count}} {{ "hits"|t }}<br>{{pasta.short_last_read_time_ago_as_string()}}</span>
                     {%- endif %} {%- endif %}
                 </td>
                 <td>
@@ -184,9 +184,9 @@
                     </td>
                     <td>
                         {% if args.show_read_stats %} {% if pasta.read_count == 1 %}
-                        <span style="font-size: small">{{pasta.read_count}} {{ "hits"|t }}<br>{{ "last"|t }} {{pasta.short_last_read_time_ago_as_string()}}</span>
+                        <span style="font-size: small">{{pasta.read_count}} {{ "hits"|t }}<br>{{pasta.short_last_read_time_ago_as_string()}}</span>
                         {%- else %}
-                        <span style="font-size: small">{{pasta.read_count}} {{ "hits"|t }}<br>{{ "last"|t }} {{pasta.short_last_read_time_ago_as_string()}}</span>
+                        <span style="font-size: small">{{pasta.read_count}} {{ "hits"|t }}<br>{{pasta.short_last_read_time_ago_as_string()}}</span>
                         {%- endif %} {%- endif %}
                     </td>
                     <td>

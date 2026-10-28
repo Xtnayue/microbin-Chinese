@@ -30,16 +30,25 @@ impl Args {
 #[derive(Parser, Debug, Clone, Serialize)]
 #[clap(author, version, about, long_about = None)]
 pub struct Args {
-    #[clap(long, env = "MICROBIN_BASIC_AUTH_USERNAME")]
+    // 五个 `SecretArg` 都加了 `hide_env_values`：clap 默认会把环境变量的**值**
+    // 原样打进 `--help`（`[env: MICROBIN_ADMIN_PASSWORD=真实密码]`），
+    // 任何把 `--help` 输出贴进工单或落盘的场景都会泄露密码。
+    #[clap(long, env = "MICROBIN_BASIC_AUTH_USERNAME", hide_env_values = true)]
     pub auth_basic_username: Option<SecretArg>,
 
-    #[clap(long, env = "MICROBIN_BASIC_AUTH_PASSWORD")]
+    #[clap(long, env = "MICROBIN_BASIC_AUTH_PASSWORD", hide_env_values = true)]
     pub auth_basic_password: Option<SecretArg>,
 
-    #[clap(long, env = "MICROBIN_ADMIN_USERNAME", default_value = "admin")]
+    #[clap(long, env = "MICROBIN_ADMIN_USERNAME", default_value = "admin", hide_env_values = true)]
     pub auth_admin_username: SecretArg,
 
-    #[clap(long, env = "MICROBIN_ADMIN_PASSWORD", default_value = "m1cr0b1n")]
+    #[clap(
+        long,
+        env = "MICROBIN_ADMIN_PASSWORD",
+        default_value = "m1cr0b1n",
+        hide_env_values = true,
+        hide_default_value = true
+    )]
     pub auth_admin_password: SecretArg,
 
     #[clap(long, env = "MICROBIN_EDITABLE", action = clap::ArgAction::Set, default_value_t = true)]
@@ -85,7 +94,7 @@ pub struct Args {
     #[clap(long, env = "MICROBIN_SHORT_PATH")]
     pub short_path: Option<PublicUrl>,
 
-    #[clap(long, env = "MICROBIN_UPLOADER_PASSWORD")]
+    #[clap(long, env = "MICROBIN_UPLOADER_PASSWORD", hide_env_values = true)]
     pub uploader_password: Option<SecretArg>,
 
     #[clap(long, env = "MICROBIN_READONLY")]

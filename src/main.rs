@@ -2,7 +2,7 @@ extern crate core;
 
 use crate::args::ARGS;
 use crate::endpoints::{
-    admin, archive, auth_admin, auth_upload, create, edit, errors, file, guide, list,
+    admin, archive, auth_admin, auth_upload, create, edit, errors, file, guide, lang, list,
     pasta as pasta_endpoint, qr, remove, static_resources,
 };
 use crate::pasta::Pasta;
@@ -47,6 +47,7 @@ pub mod endpoints {
     pub mod errors;
     pub mod file;
     pub mod guide;
+    pub mod lang;
     pub mod list;
     pub mod pasta;
     pub mod qr;
@@ -56,6 +57,21 @@ pub mod endpoints {
 
 pub struct AppState {
     pub pastas: Mutex<Vec<Pasta>>,
+}
+
+/// 为每个请求协商界面语言，并建立 task-local 作用域。
+///
+/// 必须是 task-local 而不是 thread-local：actix 每个 worker 线程跑一个
+/// `LocalSet`，同一线程上会交错轮询多个请求的 future，thread-local 会被覆盖。
+async fn lang_middleware(
+    req: actix_web::dev::ServiceRequest,
+    next: actix_web::middleware::Next<impl actix_web::body::MessageBody>,
+) -> Result<
+    actix_web::dev::ServiceResponse<impl actix_web::body::MessageBody>,
+    actix_web::Error,
+> {
+    let lang = i18n::negotiate(req.request());
+    i18n::with_lang(lang, next.call(req)).await
 }
 
 #[actix_web::main]
@@ -109,6 +125,9 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(data.clone())
+            // 语言中间件放在最外层：它要为**整个请求**建立 task-local 作用域，
+            // 这样 handler 里的 tr() 与模板渲染都能看到同一个语言。
+            .wrap(middleware::from_fn(lang_middleware))
             .wrap(middleware::NormalizePath::trim())
             .wrap(
                 middleware::Logger::new(r#"%{r}a "%r" %s %b "%{Referer}i" "%{User-Agent}i" %T"#)
@@ -117,6 +136,7 @@ async fn main() -> std::io::Result<()> {
             // X-Real-IP / X-Forwarded-For when the framework is behind a proxy.
             )
             // Conditional / Public Services
+            .service(lang::set_lang)
             .service(pasta_endpoint::getpasta)
             .service(pasta_endpoint::postpasta)
             .service(pasta_endpoint::getshortpasta)

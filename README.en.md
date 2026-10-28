@@ -118,7 +118,7 @@ Five upstream leftovers were found and fixed while reworking the permission mode
 
 ### Bilingual interface
 
-A `--language` flag and a translation table in [`src/i18n.rs`](src/i18n.rs) add runtime `en` / `zh` switching for templates, server-side messages and CLI help.
+A `--language` flag and a translation table in [`src/i18n.rs`](src/i18n.rs) provide `en` / `zh` support for templates and server-side messages. The language is **negotiated per request**: `--language` is only the fallback, and each visitor can override it with `?lang=`, the `microbin_lang` cookie, or the `Accept-Language` header (in that order of precedence). The `--help` output has no request context, so it is localised from `--language` alone.
 
 ## What is an upload?
 

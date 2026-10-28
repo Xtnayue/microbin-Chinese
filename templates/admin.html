@@ -208,161 +208,261 @@
         <br>
 
 
-        <h3>{{ "Environmental Variables"|t }}</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 35%">{{ "Argument"|t }}</th>
-                    <th style="width: 15%">{{ "Value"|t }}</th>
-                    <th style="width: 35%">{{ "Argument"|t }}</th>
-                    <th style="width: 15%">{{ "Value"|t }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>auth_basic_username</td>
-                    {% if args.auth_basic_username.as_ref().is_some() %}
-                    <td>{{ "set"|t }}</td>
-                    {% else %}
-                    <td>{{ "unset"|t }}</td>
-                    {% endif %}
-
-                    <td>auth_basic_password</td>
-                    {% if args.auth_basic_password.as_ref().is_some() %}
-                    <td>{{ "set"|t }}</td>
-                    {% else %}
-                    <td>{{ "unset"|t }}</td>
-                    {% endif %}
-                </tr>
-                <tr>
-                    <td>editable</td>
-                    <td>{{ args.editable }}</td>
-
-                    <td>footer_text</td>
-                    {% if args.footer_text.as_ref().is_some() %}
-                    <td>{{ args.footer_text.as_ref().unwrap() }}</td>
-                    {% else %}
-                    <td>{{ "unset"|t }}</td>
-                    {% endif %}
-                </tr>
-                <tr>
-                    <td>hide_footer</td>
-                    <td>{{ args.hide_footer }}</td>
-                    <td>hide_header</td>
-                    <td>{{ args.hide_header }}</td>
-                </tr>
-                <tr>
-                    <td>hide_logo</td>
-                    <td>{{ args.hide_logo }}</td>
-                    <td>no_listing</td>
-                    <td>{{ args.no_listing }}</td>
-                </tr>
-                <tr>
-                    <td>highlightsyntax</td>
-                    <td>{{ args.highlightsyntax }}</td>
-                    <td>port</td>
-                    <td>{{ args.port }}</td>
-                </tr>
-                <tr>
-                    <td>bind</td>
-                    <td>{{ args.bind }}</td>
-                    <td>enable_unlisted</td>
-                    <td>{{ args.enable_unlisted }}</td>
-                </tr>
-                <tr>
-                    <td>pure_html</td>
-                    <td>{{ args.pure_html }}</td>
-                    <td>json_db</td>
-                    <td>{{ args.json_db }}</td>
-                </tr>
-                <tr>
-                    <td>public_path</td>
-                    {% if args.public_path.as_ref().is_some() %}
-                    <td>{{ args.public_path_as_str() }}</td>
-                    {% else %}
-                    <td>{{ "unset"|t }}</td>
-                    {% endif %}
-                    <td>short_path</td>
-                    {% if args.short_path.as_ref().is_some() %}
-                    <td>{{ args.short_path_as_str() }}</td>
-                    {% else %}
-                    <td>{{ "unset"|t }}</td>
-                    {% endif %}
-                </tr>
-                <tr>
-                    <td>readonly</td>
-                    <td>{{ args.readonly }}</td>
-                    <td>show_read_stats</td>
-                    <td>{{ args.show_read_stats }}</td>
-                </tr>
-                <tr>
-                    <td>title</td>
-                    {% if args.title.as_ref().is_some() %}
-                    <td>{{ args.title.as_ref().unwrap() }}</td>
-                    {% else %}
-                    <td>{{ "unset"|t }}</td>
-                    {% endif %}
-                    <td>threads</td>
-                    <td>{{ args.threads }}</td>
-                </tr>
-                <tr>
-                    <td>gc_days</td>
-                    <td>{{ args.gc_days }}</td>
-                    <td>enable_burn_after</td>
-                    <td>{{ args.enable_burn_after }}</td>
-                </tr>
-                <tr>
-                    <td>default_burn_after</td>
-                    <td>{{ args.default_burn_after }}</td>
-                    <td>wide</td>
-                    <td>{{ args.wide }}</td>
-                </tr>
-                <tr>
-                    <td>qr</td>
-                    <td>{{ args.qr }}</td>
-                    <td>eternal_pasta</td>
-                    <td>{{ args.eternal_pasta }}</td>
-                </tr>
-                <tr>
-                    <td>enable_read_password</td>
-                    <td>{{ args.enable_read_password }}</td>
-                    <td>default_expiry</td>
-                    <td>{{ args.default_expiry }}</td>
-                </tr>
-                <tr>
-                    <td>no_file_upload</td>
-                    <td>{{ args.no_file_upload }}</td>
-                    <td>custom_css</td>
-                    {% if args.custom_css.as_ref().is_some() %}
-                    <td>{{ args.custom_css.as_ref().unwrap() }}</td>
-                    {% else %}
-                    <td>{{ "unset"|t }}</td>
-                    {% endif %}
-                </tr>
-                <tr>
-                    <td>hash_ids</td>
-                    <td>{{ args.hash_ids }}</td>
-                    <td>enable_write_password</td>
-                    <td>{{ args.enable_write_password }}</td>
-                </tr>
-                <tr>
-                    <td>default_permissions</td>
-                    <td>{{ args.default_permissions }}</td>
-                    <td>max_file_size_encrypted_mb</td>
-                    <td>{{ args.max_file_size_encrypted_mb }} MB</td>
-                </tr>
-                <tr>
-                    <td>max_file_size_unencrypted_mb</td>
-                    <td>{{ args.max_file_size_unencrypted_mb }} MB</td>
-                    <td>uploader_password</td>
-                    {% if args.uploader_password.as_ref().is_some() %}
-                    <td>{{ "set"|t }}</td>
-                    {% else %}
-                    <td>{{ "unset"|t }}</td>
-                    {% endif %}
-                </tr>
-            </tbody>
-        </table>
+        <h3>{{ "Environment variables"|t }}</h3>
+        <p style="font-size: 0.85em; opacity: 0.75; margin-top: -0.5rem;">
+            {{ "These values are read once at startup. Change the flag or environment variable and restart the process; the admin page only displays the effective result."|t }}
+        </p>
+        {% if args.pure_html %}
+        <table border="1" style="width: 100%;">
+            {% else %}
+            <table style="width: 100%; font-size: smaller;">
+                {% endif %}
+                <thead>
+                    <tr>
+                        <th style="width: 22%">{{ "Argument"|t }}</th>
+                        <th style="width: 12%">{{ "Value"|t }}</th>
+                        <th style="width: 22%">{{ "Argument"|t }}</th>
+                        <th style="width: 12%">{{ "Value"|t }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+            <tr>
+                <td colspan="4" class="arg-group">{{ "Authentication"|t }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">auth_basic_username</span>
+                <span class="arg-desc">{{ "Username for site-wide HTTP Basic authentication"|t }}</span></td>
+                {% if args.auth_basic_username.as_ref().is_some() %}
+                <td>{{ "set"|t }}</td>
+                {% else %}
+                <td>{{ "unset"|t }}</td>
+                {% endif %}
+                <td><span class="arg-name">auth_basic_password</span>
+                <span class="arg-desc">{{ "Password for site-wide HTTP Basic authentication"|t }}</span></td>
+                {% if args.auth_basic_password.as_ref().is_some() %}
+                <td>{{ "set"|t }}</td>
+                {% else %}
+                <td>{{ "unset"|t }}</td>
+                {% endif %}
+            </tr>
+            <tr>
+                <td><span class="arg-name">uploader_password</span>
+                <span class="arg-desc">{{ "Uploader password, only consulted when --readonly is on"|t }}</span></td>
+                {% if args.uploader_password.as_ref().is_some() %}
+                <td>{{ "set"|t }}</td>
+                {% else %}
+                <td>{{ "unset"|t }}</td>
+                {% endif %}
+                <td><span class="arg-name">readonly</span>
+                <span class="arg-desc">{{ "Reject new uploads (existing uploads stay readable)"|t }}</span></td>
+                <td>{{ args.readonly }}</td>
+            </tr>
+            <tr>
+                <td colspan="4" class="arg-group">{{ "Network"|t }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">port</span>
+                <span class="arg-desc">{{ "TCP port to listen on"|t }}</span></td>
+                <td>{{ args.port }}</td>
+                <td><span class="arg-name">bind</span>
+                <span class="arg-desc">{{ "Address to bind to"|t }}</span></td>
+                <td>{{ args.bind }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">threads</span>
+                <span class="arg-desc">{{ "Number of Actix worker threads"|t }}</span></td>
+                <td>{{ args.threads }}</td>
+                <td><span class="arg-name">public_path</span>
+                <span class="arg-desc">{{ "Public base URL used to build links and QR codes"|t }}</span></td>
+                {% if args.public_path.as_ref().is_some() %}
+                <td>{{ args.public_path.as_ref().unwrap() }}</td>
+                {% else %}
+                <td>{{ "unset"|t }}</td>
+                {% endif %}
+            </tr>
+            <tr>
+                <td><span class="arg-name">short_path</span>
+                <span class="arg-desc">{{ "Base URL used for short links"|t }}</span></td>
+                {% if args.short_path.as_ref().is_some() %}
+                <td>{{ args.short_path.as_ref().unwrap() }}</td>
+                {% else %}
+                <td>{{ "unset"|t }}</td>
+                {% endif %}
+                <td colspan="2"></td>
+            </tr>
+            <tr>
+                <td colspan="4" class="arg-group">{{ "Storage"|t }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">data_dir</span>
+                <span class="arg-desc">{{ "Directory holding the database and attachments"|t }}</span></td>
+                <td>{{ args.data_dir }}</td>
+                <td><span class="arg-name">json_db</span>
+                <span class="arg-desc">{{ "Use a JSON file instead of SQLite"|t }}</span></td>
+                <td>{{ args.json_db }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">gc_days</span>
+                <span class="arg-desc">{{ "Drop uploads not read for this many days (0 = never)"|t }}</span></td>
+                <td>{{ args.gc_days }}</td>
+                <td colspan="2"></td>
+            </tr>
+            <tr>
+                <td colspan="4" class="arg-group">{{ "Permissions"|t }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">enable_read_password</span>
+                <span class="arg-desc">{{ "Allow read=password; rejected with 400 when turned off"|t }}</span></td>
+                <td>{{ args.enable_read_password }}</td>
+                <td><span class="arg-name">enable_write_password</span>
+                <span class="arg-desc">{{ "Allow write=password; rejected with 400 when turned off"|t }}</span></td>
+                <td>{{ args.enable_write_password }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">enable_unlisted</span>
+                <span class="arg-desc">{{ "Allow list=no; rejected with 400 when turned off"|t }}</span></td>
+                <td>{{ args.enable_unlisted }}</td>
+                <td><span class="arg-name">default_permissions</span>
+                <span class="arg-desc">{{ "Default permission combination for new uploads"|t }}</span></td>
+                <td>{{ args.default_permissions }}</td>
+            </tr>
+            <tr>
+                <td colspan="4" class="arg-group">{{ "Upload behaviour"|t }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">editable</span>
+                <span class="arg-desc">{{ "Whether uploads may be edited"|t }}</span></td>
+                <td>{{ args.editable }}</td>
+                <td><span class="arg-name">no_file_upload</span>
+                <span class="arg-desc">{{ "Disable file uploads, text only"|t }}</span></td>
+                <td>{{ args.no_file_upload }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">eternal_pasta</span>
+                <span class="arg-desc">{{ "Allow uploads that never expire"|t }}</span></td>
+                <td>{{ args.eternal_pasta }}</td>
+                <td><span class="arg-name">enable_burn_after</span>
+                <span class="arg-desc">{{ "Offer burn-after-reading"|t }}</span></td>
+                <td>{{ args.enable_burn_after }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">default_burn_after</span>
+                <span class="arg-desc">{{ "Default burn-after-reading count"|t }}</span></td>
+                <td>{{ args.default_burn_after }}</td>
+                <td><span class="arg-name">default_expiry</span>
+                <span class="arg-desc">{{ "Default expiry for new uploads"|t }}</span></td>
+                <td>{{ args.default_expiry }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">max_expiry</span>
+                <span class="arg-desc">{{ "Maximum expiry allowed for new uploads"|t }}</span></td>
+                <td>{{ args.max_expiry }}</td>
+                <td><span class="arg-name">max_file_size_encrypted_mb</span>
+                <span class="arg-desc">{{ "Max size of one encrypted upload"|t }}</span></td>
+                <td>{{ args.max_file_size_encrypted_mb }} MB</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">max_file_size_unencrypted_mb</span>
+                <span class="arg-desc">{{ "Max size of one unencrypted upload"|t }}</span></td>
+                <td>{{ args.max_file_size_unencrypted_mb }} MB</td>
+                <td colspan="2"></td>
+            </tr>
+            <tr>
+                <td colspan="4" class="arg-group">{{ "Appearance"|t }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">title</span>
+                <span class="arg-desc">{{ "Page title, defaults to MicroBin"|t }}</span></td>
+                {% if args.title.as_ref().is_some() %}
+                <td>{{ args.title.as_ref().unwrap() }}</td>
+                {% else %}
+                <td>{{ "unset"|t }}</td>
+                {% endif %}
+                <td><span class="arg-name">footer_text</span>
+                <span class="arg-desc">{{ "Custom footer text"|t }}</span></td>
+                {% if args.footer_text.as_ref().is_some() %}
+                <td>{{ args.footer_text.as_ref().unwrap() }}</td>
+                {% else %}
+                <td>{{ "unset"|t }}</td>
+                {% endif %}
+            </tr>
+            <tr>
+                <td><span class="arg-name">hide_footer</span>
+                <span class="arg-desc">{{ "Hide the footer"|t }}</span></td>
+                <td>{{ args.hide_footer }}</td>
+                <td><span class="arg-name">hide_header</span>
+                <span class="arg-desc">{{ "Hide the top navigation bar"|t }}</span></td>
+                <td>{{ args.hide_header }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">hide_logo</span>
+                <span class="arg-desc">{{ "Hide the logo"|t }}</span></td>
+                <td>{{ args.hide_logo }}</td>
+                <td><span class="arg-name">wide</span>
+                <span class="arg-desc">{{ "Use a wider page layout"|t }}</span></td>
+                <td>{{ args.wide }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">custom_css</span>
+                <span class="arg-desc">{{ "URL of a stylesheet to load instead of the default one"|t }}</span></td>
+                {% if args.custom_css.as_ref().is_some() %}
+                <td>{{ args.custom_css.as_ref().unwrap() }}</td>
+                {% else %}
+                <td>{{ "unset"|t }}</td>
+                {% endif %}
+                <td><span class="arg-name">pure_html</span>
+                <span class="arg-desc">{{ "Skip the main stylesheet, keep only inline styles"|t }}</span></td>
+                <td>{{ args.pure_html }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">highlightsyntax</span>
+                <span class="arg-desc">{{ "Enable syntax highlighting"|t }}</span></td>
+                <td>{{ args.highlightsyntax }}</td>
+                <td><span class="arg-name">show_read_stats</span>
+                <span class="arg-desc">{{ "Show read counters on uploads"|t }}</span></td>
+                <td>{{ args.show_read_stats }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">qr</span>
+                <span class="arg-desc">{{ "Show QR code links"|t }}</span></td>
+                <td>{{ args.qr }}</td>
+                <td><span class="arg-name">default_view</span>
+                <span class="arg-desc">{{ "Default attachment layout: gallery, list or stream"|t }}</span></td>
+                <td>{{ args.default_view }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">language</span>
+                <span class="arg-desc">{{ "Fallback interface language; visitors can override it per request"|t }}</span></td>
+                <td>{{ args.language }}</td>
+                <td colspan="2"></td>
+            </tr>
+            <tr>
+                <td colspan="4" class="arg-group">{{ "Operations"|t }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">no_listing</span>
+                <span class="arg-desc">{{ "Disable the public /list page"|t }}</span></td>
+                <td>{{ args.no_listing }}</td>
+                <td><span class="arg-name">hash_ids</span>
+                <span class="arg-desc">{{ "Use hashids instead of animal names for IDs"|t }}</span></td>
+                <td>{{ args.hash_ids }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">list_server</span>
+                <span class="arg-desc">{{ "Report this server to the public MicroBin list"|t }}</span></td>
+                <td>{{ args.list_server }}</td>
+                <td><span class="arg-name">disable_telemetry</span>
+                <span class="arg-desc">{{ "Disable telemetry"|t }}</span></td>
+                <td>{{ args.disable_telemetry }}</td>
+            </tr>
+            <tr>
+                <td><span class="arg-name">disable_update_checking</span>
+                <span class="arg-desc">{{ "Disable the update check"|t }}</span></td>
+                <td>{{ args.disable_update_checking }}</td>
+                <td colspan="2"></td>
+            </tr>
+                </tbody>
+            </table>
         {% include "footer.html" %}
         <script>
             const copyURLBtns = document.getElementsByClassName("copy-button");
@@ -380,5 +480,20 @@
 
         </script>
         <style>
-
+            .arg-group {
+                padding-top: 1rem;
+                font-weight: 500;
+                opacity: 0.9;
+            }
+            .arg-name {
+                font-family: monospace;
+                font-weight: 500;
+            }
+            .arg-desc {
+                display: block;
+                margin-top: 2px;
+                font-size: 0.85em;
+                opacity: 0.7;
+                line-height: 1.35;
+            }
         </style>

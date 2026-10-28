@@ -54,6 +54,16 @@ padding-right:0.5rem; line-height: 1.5; font-size: 1.1em; padding-top: 2rem;">
             <a href="{{ args.public_path_as_str() }}/guide" style="margin-right: 0.5rem;
             margin-left: 0.5rem">{{ "Guide"|t }}</a>
 
+            <span style="float: right; font-size: 0.8em; white-space: nowrap;">
+                <a href="{{ args.public_path_as_str() }}/lang/zh" class="lang-switch">中文</a>
+                <span style="opacity: 0.4;">/</span>
+                <a href="{{ args.public_path_as_str() }}/lang/en" class="lang-switch">English</a>
+            </span>
+            <script>
+                document.querySelectorAll('a.lang-switch').forEach(function (a) {
+                    a.href += '?next=' + encodeURIComponent(location.pathname + location.search);
+                });
+            </script>
 
         </div>
 

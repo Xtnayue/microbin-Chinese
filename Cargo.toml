@@ -54,6 +54,9 @@ webpki-roots = { version = "0.26", optional = true }
 zip = "2.4.2"
 tempfile = "3.25.0"
 bytes = "1.11.0"
+# 仅用于 `tokio::task_local!`（按请求保存界面语言）。actix-rt 本来就依赖 tokio，
+# 这里只是把 task_local 宏显式引入，不新增编译产物。
+tokio = { version = "1", default-features = false, features = ["rt"] }
 
 [dependencies.openssl]
 version = "0.10.64"

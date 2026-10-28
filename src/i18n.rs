@@ -1,14 +1,28 @@
 //! 国际化（i18n）支持。
 //!
 //! 设计要点：
-//! * 语言在启动时确定（命令行参数 `--language` / 环境变量 `MICROBIN_LANGUAGE`），默认英文。
+//! * **语言是每个请求各自协商的**，不是进程级设置。优先级：
+//!   `?lang=` 查询参数 → `microbin_lang` cookie → `Accept-Language` → `--language` 兜底。
+//!   这样同一个实例可以同时服务中文和英文读者。
 //! * 翻译表以 **英文原文作为键**，中文译文作为值。这样英文环境下是恒等映射，
 //!   模板里直接书写英文原文即可，可读性最好；中文环境查表，查不到时回退英文。
 //! * 模板中通过自定义 Askama filter 使用：`{{ "New"|t }}`。
 //! * Rust 代码中通过 [`tr`] 使用。
+//!
+//! ## 为什么用 `task_local!` 而不是 `thread_local!`
+//!
+//! `tr()` 是同步函数，而 Askama 的 filter 是自由函数，拿不到请求上下文，所以
+//! 语言只能从「环境」里取。这里必须是 **task-local** 而非 thread-local：actix-web
+//! 每个 worker 线程跑一个 `LocalSet`，同一个线程上会交错轮询多个请求的 future，
+//! 一旦某个请求在 `.await` 处让出，thread-local 就会被另一个请求覆盖。
+//! `task_local` 的 `scope` 会在每次 poll 前后保存/恢复取值，交错也是安全的。
 
+use actix_web::HttpRequest;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+
+/// 记住用户语言选择的 cookie 名。
+pub const LANG_COOKIE: &str = "microbin_lang";
 
 /// 支持的语言。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -20,9 +34,22 @@ pub enum Lang {
 impl Lang {
     /// 解析语言代码，无法识别时回退到英文。
     pub fn from_code(code: &str) -> Lang {
-        match code.trim().to_ascii_lowercase().as_str() {
-            "zh" | "zh-cn" | "zh_cn" | "cn" | "zh-hans" | "zh-hant" | "chinese" => Lang::Zh,
-            _ => Lang::En,
+        Self::try_from_code(code).unwrap_or(Lang::En)
+    }
+
+    /// 解析语言代码，无法识别时返回 `None`。
+    ///
+    /// 与 [`Lang::from_code`] 的区别：这个版本能区分「明确要求英文」和
+    /// 「要求了一个我们不认识的语言」。`Accept-Language` 协商需要后者 ——
+    /// 浏览器发来 `fr,zh;q=0.9` 时，应该继续往后找 `zh`，而不是直接落到英文。
+    pub fn try_from_code(code: &str) -> Option<Lang> {
+        let code = code.trim().to_ascii_lowercase();
+        // `zh-CN` / `zh_CN` / `zh-Hans-CN` 这类带地区或文字的子标签，只看主标签。
+        let primary = code.split(['-', '_']).next().unwrap_or("");
+        match primary {
+            "zh" | "cn" | "chinese" => Some(Lang::Zh),
+            "en" => Some(Lang::En),
+            _ => None,
         }
     }
 
@@ -32,14 +59,143 @@ impl Lang {
             Lang::Zh => "zh",
         }
     }
+
+    /// 语言自己的名称，用于切换链接（不翻译，始终显示本语言写法）。
+    pub fn native_name(&self) -> &'static str {
+        match self {
+            Lang::En => "English",
+            Lang::Zh => "中文",
+        }
+    }
 }
 
-/// 全局语言状态，首次访问时从命令行参数/环境变量解析。
-static LANG: Lazy<Lang> = Lazy::new(|| Lang::from_code(&crate::args::ARGS.language));
+tokio::task_local! {
+    /// 当前请求协商出的语言。由 `main.rs` 的中间件用 [`with_lang`] 建立作用域。
+    pub static REQ_LANG: Lang;
+}
 
-/// 当前语言。
+/// 进程级兜底语言，来自 `--language` / `MICROBIN_LANGUAGE`。
+pub fn default_lang() -> Lang {
+    Lang::from_code(&crate::args::ARGS.language)
+}
+
+/// 当前语言：请求作用域内取请求语言，作用域外（启动日志、`--help`）取兜底值。
 pub fn lang() -> Lang {
-    *LANG
+    REQ_LANG.try_with(|l| *l).unwrap_or_else(|_| default_lang())
+}
+
+/// 在一个请求的作用域内以指定语言执行。
+///
+/// 必须包住**整个请求 future**（而不是只包住渲染），否则 handler 里的 `tr()`
+/// 调用会落到兜底语言上。
+pub async fn with_lang<F: std::future::Future>(lang: Lang, fut: F) -> F::Output {
+    REQ_LANG.scope(lang, fut).await
+}
+
+/// 按优先级为这个请求协商语言。
+///
+/// 顺序：`?lang=` → `microbin_lang` cookie → `Accept-Language` → `--language`。
+/// 前两者是用户的**明确选择**，`Accept-Language` 只是浏览器的偏好，所以排在后面；
+/// 三者都没有时才用运维设的兜底值。
+pub fn negotiate(req: &HttpRequest) -> Lang {
+    if let Some(v) = query_lang(req) {
+        return v;
+    }
+    if let Some(v) = cookie_lang(req) {
+        return v;
+    }
+    if let Some(v) = header_lang(req) {
+        return v;
+    }
+    default_lang()
+}
+
+/// `?lang=zh` / `?lang=en`：一次性的显式覆盖，不写 cookie。
+fn query_lang(req: &HttpRequest) -> Option<Lang> {
+    let q = req.query_string();
+    for pair in q.split('&') {
+        // 不能在这里用 `?`：像 `?debug&lang=zh` 这样前面带无等号参数时，
+        // 提前返回会让后面的 `lang=zh` 整个失效。
+        let (k, v) = match pair.split_once('=') {
+            Some(kv) => kv,
+            None => continue,
+        };
+        if k != "lang" {
+            continue;
+        }
+        // 查询串里可能是百分号编码，这里只处理 ASCII 语言码，够用。
+        let decoded = percent_decode(v);
+        return Lang::try_from_code(&decoded);
+    }
+    None
+}
+
+/// 解码查询串里的百分号编码。
+///
+/// 按字节解码后统一做一次 UTF-8 校验：逐个 `byte as char` 会把多字节字符
+/// 拆成 Latin-1 乱码（`%E4%B8%AD` 会变成 `ä¸­` 而不是 `中`）。
+pub fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).ok();
+            if let Some(h) = hex {
+                if let Ok(b) = u8::from_str_radix(h, 16) {
+                    out.push(b);
+                    i += 3;
+                    continue;
+                }
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// `Cookie: microbin_lang=zh`
+fn cookie_lang(req: &HttpRequest) -> Option<Lang> {
+    req.cookie(LANG_COOKIE)
+        .and_then(|c| Lang::try_from_code(c.value()))
+}
+
+/// `Accept-Language: zh-CN,zh;q=0.9,en;q=0.8`
+///
+/// 按 q 值从高到低找**第一个我们支持的语言**；一个都不支持时返回 `None`，
+/// 交给下一级兜底。注意不能一上来就把不认识的标签映射成英文 —— 那样
+/// `fr,zh;q=0.9` 会被误判成英文。
+fn header_lang(req: &HttpRequest) -> Option<Lang> {
+    let raw = req.headers().get(actix_web::http::header::ACCEPT_LANGUAGE)?;
+    let raw = raw.to_str().ok()?;
+
+    let mut tags: Vec<(f32, &str)> = Vec::new();
+    for part in raw.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let (tag, q) = match part.split_once(';') {
+            Some((tag, params)) => {
+                let q = params
+                    .trim()
+                    .strip_prefix("q=")
+                    .or_else(|| params.trim().strip_prefix("Q="))
+                    .and_then(|v| v.trim().parse::<f32>().ok())
+                    .unwrap_or(1.0);
+                (tag.trim(), q)
+            }
+            None => (part, 1.0),
+        };
+        if q > 0.0 {
+            tags.push((q, tag));
+        }
+    }
+    // 稳定排序：q 相同时保留原始顺序。
+    tags.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    tags.iter().find_map(|(_, tag)| Lang::try_from_code(tag))
 }
 
 macro_rules! zh_table {
@@ -106,9 +262,61 @@ static ZH: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         "Update type" => "更新类型",
         "No updates available." => "暂无可用更新。",
         "URL Redirects" => "URL 跳转",
-        "Environmental Variables" => "环境变量",
         "Argument" => "参数",
         "Value" => "值",
+        // ---- admin 页：环境变量表的说明 ----
+        "Environment variables" => "环境变量",
+        "These values are read once at startup. Change the flag or environment variable and restart the process; the admin page only displays the effective result." => "这些值在启动时读取一次。修改命令行参数或环境变量后需重启进程；本页只展示最终生效的结果。",
+        "Authentication" => "认证",
+        "Network" => "网络",
+        "Storage" => "存储",
+        "Permissions" => "权限模型",
+        "Upload behaviour" => "上传行为",
+        "Appearance" => "界面外观",
+        "Operations" => "运维",
+        "Username for site-wide HTTP Basic authentication" => "全站 HTTP Basic 认证的用户名",
+        "Password for site-wide HTTP Basic authentication" => "全站 HTTP Basic 认证的密码",
+        "Uploader password, only consulted when --readonly is on" => "上传者口令，仅在开启 --readonly 时校验",
+        "Reject new uploads (existing uploads stay readable)" => "拒绝新建上传（已有上传仍可读取）",
+        "TCP port to listen on" => "监听的 TCP 端口",
+        "Address to bind to" => "绑定的监听地址",
+        "Number of Actix worker threads" => "Actix 工作线程数",
+        "Public base URL used to build links and QR codes" => "对外公开的地址前缀，用于生成链接与二维码",
+        "Base URL used for short links" => "短链接使用的地址前缀",
+        "Directory holding the database and attachments" => "数据库与附件所在目录",
+        "Use a JSON file instead of SQLite" => "用 JSON 文件代替 SQLite",
+        "Drop uploads not read for this many days (0 = never)" => "多少天未被读取就回收（0 表示不回收）",
+        "Allow read=password; rejected with 400 when turned off" => "允许 read=password；关闭后提交该取值会被 400 拒绝",
+        "Allow write=password; rejected with 400 when turned off" => "允许 write=password；关闭后提交该取值会被 400 拒绝",
+        "Allow list=no; rejected with 400 when turned off" => "允许 list=no；关闭后提交该取值会被 400 拒绝",
+        "Default permission combination for new uploads" => "新建上传的默认权限组合",
+        "Whether uploads may be edited" => "是否允许编辑上传内容",
+        "Disable file uploads, text only" => "禁用文件上传，只接受文本",
+        "Allow uploads that never expire" => "允许创建永不过期的上传",
+        "Offer burn-after-reading" => "提供阅后即焚选项",
+        "Default burn-after-reading count" => "默认的阅后即焚次数",
+        "Default expiry for new uploads" => "新建上传的默认有效期",
+        "Maximum expiry allowed for new uploads" => "允许的最大有效期",
+        "Max size of one encrypted upload" => "单个加密上传的大小上限",
+        "Max size of one unencrypted upload" => "单个未加密上传的大小上限",
+        "Page title, defaults to MicroBin" => "页面标题，默认为 MicroBin",
+        "Custom footer text" => "自定义页脚文字",
+        "Hide the footer" => "隐藏页脚",
+        "Hide the top navigation bar" => "隐藏顶部导航栏",
+        "Hide the logo" => "隐藏 Logo",
+        "Use a wider page layout" => "使用更宽的页面布局",
+        "URL of a stylesheet to load instead of the default one" => "替代默认样式表的 CSS 地址",
+        "Skip the main stylesheet, keep only inline styles" => "不加载主样式表，只用内联样式",
+        "Enable syntax highlighting" => "启用语法高亮",
+        "Show read counters on uploads" => "在上传页显示阅读次数",
+        "Show QR code links" => "显示二维码链接",
+        "Default attachment layout: gallery, list or stream" => "附件默认视图：gallery（画廊）、list（列表）或 stream（流式）",
+        "Fallback interface language; visitors can override it per request" => "兜底界面语言；访问者可按请求各自覆盖",
+        "Disable the public /list page" => "关闭公开的 /list 列表页",
+        "Use hashids instead of animal names for IDs" => "用 hashid 代替动物名作为标识",
+        "Report this server to the public MicroBin list" => "把本服务器登记到公开的 MicroBin 列表",
+        "Disable telemetry" => "关闭遥测",
+        "Disable the update check" => "关闭更新检查",
         "set" => "已启用",
         "unset" => "未启用",
         "Text" => "文本",
@@ -327,7 +535,7 @@ static ZH_HELP: &[(&str, &str)] = &[
     ("max-file-size-encrypted-mb", "加密上传的最大文件大小（MB）"),
     ("max-file-size-unencrypted-mb", "未加密上传的最大文件大小（MB）"),
     ("default-view", "新建上传页附件视图的默认选项：gallery（画廊）、list（列表）或 stream（流式）；URL 上的 ?view= 优先"),
-    ("language", "界面语言：en（英文）或 zh（中文），默认 en"),
+    ("language", "兜底界面语言：en（英文）或 zh（中文）；访问者可用 cookie / Accept-Language / ?lang= 各自覆盖"),
 ];
 
 /// 按当前语言本地化 clap 的命令定义。

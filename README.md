@@ -18,13 +18,22 @@ MicroBin 是一个超小、功能丰富、可配置、自包含且可自托管�
 
 ### 语言切换
 
-界面语言在启动时确定，支持命令行参数与环境变量两种方式：
+界面语言**按访问者逐个请求协商**，不需要重启，也不需要为不同用户部署多份实例。
+
+优先级从高到低：
+
+| 优先级 | 来源 | 说明 |
+| --- | --- | --- |
+| 1 | `?lang=zh` 查询参数 | 一次性生效，不落 cookie。适合分享「指定语言的链接」 |
+| 2 | `microbin_lang` Cookie | 点导航栏右侧的「中文 / English」即写入，长期有效 |
+| 3 | `Accept-Language` 请求头 | 浏览器语言设置。按 q 值排序，跳过不支持的语言再取下一个（`fr,zh;q=0.9` 会落到中文） |
+| 4 | `--language` / `MICROBIN_LANGUAGE` | **兜底值**，仅当访问者以上三项都没有表达偏好时使用 |
 
 ```bash
-# 方式一：命令行参数
+# 设置全站兜底语言（命令行参数）
 microbin --language zh
 
-# 方式二：环境变量
+# 或环境变量
 export MICROBIN_LANGUAGE=zh
 microbin
 ```
@@ -36,7 +45,11 @@ microbin
 | `en`（默认） | 英文界面，与上游完全一致 |
 | `zh` | 简体中文界面 |
 
-同时支持 `zh-cn`、`zh_cn`、`cn`、`zh-hans` 等写法，均等价于 `zh`；无法识别的取值会回退为英文。
+同时支持 `zh-cn`、`zh_cn`、`cn`、`zh-hans` 等写法，均等价于 `zh`；无法识别的取值会回退为 `en`。
+
+> 例外：`microbin --help` 的输出没有请求上下文，只用 `--language` 这一处的值来决定语言。
+
+实现上，语言在中间件里解析后存入 `tokio::task_local!`，随请求 future 一起传递。不能用 thread-local——actix 每个 worker 线程会交错轮询多个请求，同一线程上的并发请求会互相覆盖语言。
 
 ### 汉化实现方式
 
@@ -53,7 +66,7 @@ microbin
 
 #### 一、中英双语界面
 
-新增 `--language` 参数与 `src/i18n.rs` 翻译表，模板与服务端提示、CLI 帮助均支持 `en` / `zh` 切换。详见上文「关于简体中文版」。
+新增 `--language` 参数与 `src/i18n.rs` 翻译表，模板与服务端提示均支持 `en` / `zh`。语言**按请求协商**，`--language` 只是兜底值，访问者可用 `?lang=` / `microbin_lang` Cookie / `Accept-Language` 各自覆盖；`--help` 的输出只用 `--language` 决定。详见上文「关于简体中文版」。
 
 #### 二、权限模型重构
 

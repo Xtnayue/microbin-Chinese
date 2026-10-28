@@ -177,7 +177,7 @@ pub struct Args {
     #[clap(long, env = "MICROBIN_DEFAULT_VIEW", default_value = "gallery")]
     pub default_view: String,
 
-    /// Interface language: en (English) or zh (Chinese). Defaults to en.
+    /// Fallback interface language: en (English) or zh (Chinese). This is only used when a visitor expresses no preference -- each request can override it via the microbin_lang cookie, an Accept-Language header, or a ?lang= query parameter.
     #[clap(long, env = "MICROBIN_LANGUAGE", default_value = "en")]
     pub language: String,
 }

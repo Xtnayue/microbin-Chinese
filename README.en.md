@@ -106,6 +106,10 @@ The old model had no `refuse`, so migration never produces `write = refuse`. Bot
 
 Note: content uploaded with the old browser-side encryption (the `secret` level) can no longer be decrypted in the browser and will remain ciphertext.
 
+### Responsive layout
+
+Upstream pinned `<body>` to `max-width: 800px` (1080px with `--wide`), so a wide window only ever showed a narrow centred column — multi-column tables such as the admin page were squeezed into a tall strip. The layout now follows the window width and only stops at 1600px on very wide screens, to keep paragraphs readable; `--wide` fills the window entirely. Narrow (mobile) behaviour is unchanged.
+
 ### Other upstream bugs fixed along the way
 
 Five upstream leftovers were found and fixed while reworking the permission model:

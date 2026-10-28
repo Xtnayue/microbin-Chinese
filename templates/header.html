@@ -22,13 +22,11 @@
 
 </head>
 {% if args.wide %}
-
-<body style="max-width: 1080px; margin: auto; padding-left:0.5rem;
-padding-right:0.5rem; line-height: 1.5; font-size: 1.1em; padding-top: 2rem;">
+{# --wide：占满浏览器窗口，不再居中留白 #}
+<body style="box-sizing: border-box; max-width: 100%; margin: 0 auto; padding: 2rem 1rem 2rem; line-height: 1.5; font-size: 1.1em;">
     {%- else %}
-
-    <body style=" max-width: 800px; margin: auto; padding-left:0.5rem;
-    padding-right:0.5rem; padding-top: 2rem; line-height: 1.5; font-size: 1.1em; ">
+{# 默认：跟随窗口宽度自适应，只在超宽屏上停在 1600px，避免长文一行过长 #}
+<body style="box-sizing: border-box; max-width: 1600px; margin: 0 auto; padding: 2rem 1rem 2rem; line-height: 1.5; font-size: 1.1em;">
         {%- endif %}
         <br>
         {% if !args.hide_header %}

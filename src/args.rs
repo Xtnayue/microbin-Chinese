@@ -109,6 +109,7 @@ pub struct Args {
     #[clap(short, long, env = "MICROBIN_DEFAULT_BURN_AFTER", default_value_t = 0)]
     pub default_burn_after: u16,
 
+    /// Use the full width of the browser window instead of a column that stops at 1600px.
     #[clap(long, env = "MICROBIN_WIDE")]
     pub wide: bool,
 

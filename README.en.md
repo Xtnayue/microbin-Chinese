@@ -13,19 +13,24 @@ MicroBin is a super tiny, feature-rich, configurable, self-contained and self-ho
 
 ### Host MicroBin yourself
 
-Run our quick docker setup script ([DockerHub](https://hub.docker.com/r/danielszabo99/microbin)):
-```bash
-bash <(curl -s https://microbin.eu/docker.sh)
-```
-
-Or install it manually from [Cargo](https://crates.io/crates/microbin):
+Run the docker setup script from this repository (it also downloads the matching
+`.env` and `compose.yaml`):
 
 ```bash
-cargo install microbin;
-curl -L -O https://raw.githubusercontent.com/szabodanika/microbin/master/.env;
-source .env;
-microbin
+bash <(curl -s https://raw.githubusercontent.com/Xtnayue/microbin-Chinese/master/docker-setup.sh)
 ```
+
+Or run the image directly:
+
+```bash
+docker run -d --name microbin -p 8080:8080 \
+  -v microbin_data:/app/microbin_data \
+  ghcr.io/xtnayue/microbin-chinese:latest
+```
+
+The Chinese README ([README.md](README.md)) documents this fork's differences:
+per-request language negotiation and the three independent permissions
+(`read` / `write` / `list`).
 
 On our website [microbin.eu](https://microbin.eu), you will find the following:
 

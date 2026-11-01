@@ -1,6 +1,8 @@
 services:
   microbin:
-    image: danielszabo99/microbin:latest
+    # 本分支自己构建的镜像（GHCR）。上游的 danielszabo99/microbin 没有
+    # 这里的权限模型与中英双语界面，换回去会得到完全不同的行为。
+    image: ghcr.io/xtnayue/microbin-chinese:latest
     restart: always
     ports:
      - "${MICROBIN_PORT}:8080"

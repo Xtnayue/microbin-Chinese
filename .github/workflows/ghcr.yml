@@ -9,6 +9,12 @@ on:
   push:
     branches: [master]
     tags: ["v*.*.*"]
+    # Dockerfile 里是 `COPY . .`，改一行 README 也会打穿缓存、把整个
+    # cargo build 重跑一遍（约 7 分钟），而产物二进制根本没变。
+    # 纯文档改动直接跳过。（tag 推送不受 paths 过滤影响，GitHub 的规则。）
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
   pull_request:
     branches: [master]
   workflow_dispatch:

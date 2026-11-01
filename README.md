@@ -31,6 +31,8 @@ docker run -d --name microbin -p 8080:8080 \
 
 镜像地址：`ghcr.io/xtnayue/microbin-chinese`，标签 `latest` / `master` / `sha-xxxxxxx`。
 
+> ⚠️ 默认管理员账号是 `admin` / `m1cr0b1n`。**公网部署前务必改掉**（`.env` 里的 `MICROBIN_ADMIN_USERNAME` 与 `MICROBIN_ADMIN_PASSWORD`），否则管理页对所有人敞开。
+
 ## 界面语言
 
 语言**按访问者逐个请求协商**，切换不需要重启，也不需要为不同用户部署多份实例。导航栏右侧点「中文 / English」即可，选择会记住。

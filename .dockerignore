@@ -1,0 +1,16 @@
+# 只把构建镜像需要的东西送进 Docker 上下文。
+# 没有这个文件时 `COPY . .` 会把本地 3.8G 的 target/、以及 demo-data 之类的
+# 运行数据一起送过去 —— 既慢，又会把测试数据打进镜像层。
+target/
+demo-data/
+guide-data/
+url_acl_data/
+pasta_data/
+microbin_data/
+.env
+*.env
+.git/
+.github/
+node_modules/
+**/*.rs.bk
+*.pdb

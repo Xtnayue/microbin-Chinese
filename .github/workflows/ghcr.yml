@@ -19,10 +19,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # 传给 docker/build-push-action 的平台列表。
-  # arm64 走 QEMU 模拟，Rust 编译会慢 3~5 倍；只部署 x86 服务器的话
-  # 把这里改成 linux/amd64 能省一半以上时间。
-  PLATFORMS: linux/amd64,linux/arm64
+  # 默认只编 x86_64。arm64 需要 QEMU 模拟，而这个项目要编 vendored OpenSSL
+  # （openssl 的 `vendored` feature）+ SQLite + oniguruma，再加 release 的 LTO，
+  # 模拟下很容易跑满一两个小时。要出 arm64 就改成：
+  #   PLATFORMS: linux/amd64,linux/arm64
+  # 并把下面的 timeout-minutes 提到 300 以上。
+  PLATFORMS: linux/amd64
 
 jobs:
   build:
@@ -38,7 +40,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # arm64 的构建要靠 QEMU 模拟，不装这一步 buildx 会在 arm64 上直接失败
+      # 双架构时这一步不能省：arm64 的构建靠 QEMU 模拟。
+      # 只编 amd64 时它不起作用，但留着无害，切换架构时不用再改。
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
